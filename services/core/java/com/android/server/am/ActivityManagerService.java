@@ -349,7 +349,6 @@ import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FrameworkStatsLog;
-import com.android.internal.util.GamingModeHelper;
 import com.android.internal.util.MemInfoReader;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.DecFunction;
@@ -1512,10 +1511,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     private ParcelFileDescriptor[] mLifeMonitorFds;
 
     static final HostingRecord sNullHostingRecord = new HostingRecord(null);
-
-    private final SwipeToScreenshotObserver mSwipeToScreenshotObserver;
-    private boolean mIsSwipeToScreenshotEnabled;
-
     /**
      * Used to notify activity lifecycle events.
      */
@@ -1793,9 +1788,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                     synchronized (ActivityManagerService.this) {
                         ((ContentProviderRecord) msg.obj).onProviderPublishStatusLocked(false);
                     }
-                } break;
-                case GamingModeHelper.MSG_SEND_GAMING_MODE_BROADCAST: {
-                    mContext.sendBroadcastAsUser((Intent) msg.obj, UserHandle.CURRENT_OR_SELF);
                 } break;
             }
         }
@@ -2247,7 +2239,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         mUseFifoUiScheduling = false;
         mEnableOffloadQueue = false;
         mFgBroadcastQueue = mBgBroadcastQueue = mOffloadBroadcastQueue = null;
-        mSwipeToScreenshotObserver = null;
     }
 
     // Note: This method is invoked on the main thread but may need to attach various
@@ -2374,7 +2365,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         mInternal = new LocalService();
         mPendingStartActivityUids = new PendingStartActivityUids(mContext);
         mTraceErrorLogger = new TraceErrorLogger();
-        mSwipeToScreenshotObserver = new SwipeToScreenshotObserver();
     }
 
     public void setSystemServiceManager(SystemServiceManager mgr) {
@@ -4488,7 +4478,12 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             ProfilerInfo profilerInfo = mAppProfiler.setupProfilerInfoLocked(thread, app, instr);
 
-            final String buildSerial = Build.UNKNOWN;
+            // We deprecated Build.SERIAL and it is not accessible to
+            // Instant Apps and target APIs higher than O MR1. Since access to the serial
+            // is now behind a permission we push down the value.
+            final String buildSerial = (!appInfo.isInstantApp()
+                    && appInfo.targetSdkVersion < Build.VERSION_CODES.P)
+                            ? sTheRealBuildSerial : Build.UNKNOWN;
 
             // Figure out whether the app needs to run in autofill compat mode.
             AutofillOptions autofillOptions = null;
@@ -4742,7 +4737,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             storageManager.commitChanges();
         } catch (Exception e) {
             PowerManager pm = (PowerManager)
-                     mContext.getSystemService(Context.POWER_SERVICE);
+                     mInjector.getContext().getSystemService(Context.POWER_SERVICE);
             pm.reboot("Checkpoint commit failed");
         }
 
@@ -7530,7 +7525,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             mUserController.setInitialConfig(userSwitchUiEnabled, maxRunningUsers,
                     delayUserDataLocking);
             mWaitForNetworkTimeoutMs = waitForNetworkTimeoutMs;
-            mSwipeToScreenshotObserver.registerObserver();
         }
         mAppErrors.loadAppsNotReportingCrashesFromConfig(res.getString(
                 com.android.internal.R.string.config_appsNotReportingCrashes));
@@ -7557,7 +7551,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             mLocalDeviceIdleController =
                     LocalServices.getService(DeviceIdleInternal.class);
             mActivityTaskManager.onSystemReady();
-            mActivityTaskManager.mGamingModeHelper = new GamingModeHelper(mContext, mHandler);
             // Make sure we have the current profile info, since it is needed for security checks.
             mUserController.onSystemReady();
             mAppOpsService.systemReady();
@@ -17293,43 +17286,5 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (Trace.isTagEnabled(traceTag)) {
             Trace.traceBegin(traceTag, methodName + subInfo);
         }
-    }
-
-    private final class SwipeToScreenshotObserver extends ContentObserver {
-
-        SwipeToScreenshotObserver() {
-            super(mHandler);
-        }
-
-        void registerObserver() {
-            update();
-            mContext.getContentResolver().registerContentObserver(
-                Settings.System.getUriFor(Settings.System.THREE_FINGER_GESTURE),
-                false, this, UserHandle.USER_ALL);
-        }
-
-        private void update() {
-            mIsSwipeToScreenshotEnabled = Settings.System.getIntForUser(
-                mContext.getContentResolver(), Settings.System.THREE_FINGER_GESTURE,
-                0, UserHandle.USER_CURRENT) == 1;
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            update();
-        }
-    }
-
-    @Override
-    public boolean isSwipeToScreenshotGestureActive() {
-        synchronized (this) {
-            return mIsSwipeToScreenshotEnabled &&
-                SystemProperties.getBoolean("sys.android.screenshot", false);
-        }
-    }
-
-    @Override
-    public boolean shouldForceCutoutFullscreen(String packageName) {
-        return mActivityTaskManager.shouldForceCutoutFullscreen(packageName);
     }
 }

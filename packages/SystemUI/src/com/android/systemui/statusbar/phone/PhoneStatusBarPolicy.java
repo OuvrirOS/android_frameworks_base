@@ -22,9 +22,6 @@ import android.app.AlarmManager;
 import android.app.AlarmManager.AlarmClockInfo;
 import android.app.IActivityManager;
 import android.app.SynchronousUserSwitchObserver;
-import android.bluetooth.BluetoothClass;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -32,12 +29,10 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.media.AudioManager;
-import android.nfc.NfcAdapter;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
-import android.provider.Settings;
 import android.provider.Settings.Global;
 import android.service.notification.ZenModeConfig;
 import android.telecom.TelecomManager;
@@ -47,13 +42,15 @@ import android.view.View;
 
 import androidx.lifecycle.Observer;
 
-import com.android.settingslib.bluetooth.CachedBluetoothDevice;
-import com.android.systemui.Dependency;
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dagger.qualifiers.DisplayId;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
+import com.android.systemui.privacy.PrivacyItem;
+import com.android.systemui.privacy.PrivacyItemController;
+import com.android.systemui.privacy.PrivacyType;
+import com.android.systemui.privacy.logging.PrivacyLogger;
 import com.android.systemui.qs.tiles.DndTile;
 import com.android.systemui.qs.tiles.RotationLockTile;
 import com.android.systemui.screenrecord.RecordingController;
@@ -67,19 +64,18 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
 import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
+import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.statusbar.policy.NextAlarmController;
 import com.android.systemui.statusbar.policy.RotationLockController;
 import com.android.systemui.statusbar.policy.RotationLockController.RotationLockControllerCallback;
 import com.android.systemui.statusbar.policy.SensorPrivacyController;
 import com.android.systemui.statusbar.policy.UserInfoController;
 import com.android.systemui.statusbar.policy.ZenModeController;
-import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.RingerModeTracker;
 import com.android.systemui.util.time.DateFormatUtil;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executor;
@@ -98,25 +94,31 @@ public class PhoneStatusBarPolicy
                 ZenModeController.Callback,
                 DeviceProvisionedListener,
                 KeyguardStateController.Callback,
-                TunerService.Tunable,
+                PrivacyItemController.Callback,
+                LocationController.LocationChangeCallback,
                 RecordingController.RecordingStateChangeCallback {
     private static final String TAG = "PhoneStatusBarPolicy";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+
+    static final int LOCATION_STATUS_ICON_ID = PrivacyType.TYPE_LOCATION.getIconId();
 
     private final String mSlotCast;
     private final String mSlotHotspot;
     private final String mSlotBluetooth;
     private final String mSlotTty;
     private final String mSlotZen;
-    private final String mSlotVolume;
+    private final String mSlotMute;
+    private final String mSlotVibrate;
     private final String mSlotAlarmClock;
     private final String mSlotManagedProfile;
     private final String mSlotRotate;
     private final String mSlotHeadset;
     private final String mSlotDataSaver;
+    private final String mSlotLocation;
+    private final String mSlotMicrophone;
+    private final String mSlotCamera;
     private final String mSlotSensorsOff;
     private final String mSlotScreenRecord;
-    private final String mSlotNfc;
     private final int mDisplayId;
     private final SharedPreferences mSharedPreferences;
     private final DateFormatUtil mDateFormatUtil;
@@ -139,13 +141,17 @@ public class PhoneStatusBarPolicy
     private final ZenModeController mZenController;
     private final DeviceProvisionedController mProvisionedController;
     private final KeyguardStateController mKeyguardStateController;
+    private final LocationController mLocationController;
+    private final PrivacyItemController mPrivacyItemController;
     private final Executor mUiBgExecutor;
     private final SensorPrivacyController mSensorPrivacyController;
     private final RecordingController mRecordingController;
     private final RingerModeTracker mRingerModeTracker;
+    private final PrivacyLogger mPrivacyLogger;
 
     private boolean mZenVisible;
-    private boolean mVolumeVisible;
+    private boolean mVibrateVisible;
+    private boolean mMuteVisible;
     private boolean mCurrentUserSetup;
 
     private boolean mManagedProfileIconVisible = false;
@@ -153,15 +159,8 @@ public class PhoneStatusBarPolicy
     private BluetoothController mBluetooth;
     private AlarmManager.AlarmClockInfo mNextAlarm;
 
-    private NfcAdapter mAdapter;
-    private final Context mContext;
-    private boolean mShowBluetoothBattery;
-
-    private static final String BLUETOOTH_SHOW_BATTERY =
-            "system:" + Settings.System.BLUETOOTH_SHOW_BATTERY;
-
     @Inject
-    public PhoneStatusBarPolicy(Context context, StatusBarIconController iconController,
+    public PhoneStatusBarPolicy(StatusBarIconController iconController,
             CommandQueue commandQueue, BroadcastDispatcher broadcastDispatcher,
             @UiBackground Executor uiBgExecutor, @Main Resources resources,
             CastController castController, HotspotController hotspotController,
@@ -170,13 +169,15 @@ public class PhoneStatusBarPolicy
             DataSaverController dataSaverController, ZenModeController zenModeController,
             DeviceProvisionedController deviceProvisionedController,
             KeyguardStateController keyguardStateController,
+            LocationController locationController,
             SensorPrivacyController sensorPrivacyController, IActivityManager iActivityManager,
             AlarmManager alarmManager, UserManager userManager,
             RecordingController recordingController,
             @Nullable TelecomManager telecomManager, @DisplayId int displayId,
             @Main SharedPreferences sharedPreferences, DateFormatUtil dateFormatUtil,
-            RingerModeTracker ringerModeTracker) {
-        mContext = context;
+            RingerModeTracker ringerModeTracker,
+            PrivacyItemController privacyItemController,
+            PrivacyLogger privacyLogger) {
         mIconController = iconController;
         mCommandQueue = commandQueue;
         mBroadcastDispatcher = broadcastDispatcher;
@@ -194,48 +195,38 @@ public class PhoneStatusBarPolicy
         mZenController = zenModeController;
         mProvisionedController = deviceProvisionedController;
         mKeyguardStateController = keyguardStateController;
+        mLocationController = locationController;
+        mPrivacyItemController = privacyItemController;
         mSensorPrivacyController = sensorPrivacyController;
         mRecordingController = recordingController;
         mUiBgExecutor = uiBgExecutor;
         mTelecomManager = telecomManager;
         mRingerModeTracker = ringerModeTracker;
+        mPrivacyLogger = privacyLogger;
 
         mSlotCast = resources.getString(com.android.internal.R.string.status_bar_cast);
         mSlotHotspot = resources.getString(com.android.internal.R.string.status_bar_hotspot);
         mSlotBluetooth = resources.getString(com.android.internal.R.string.status_bar_bluetooth);
         mSlotTty = resources.getString(com.android.internal.R.string.status_bar_tty);
         mSlotZen = resources.getString(com.android.internal.R.string.status_bar_zen);
-        mSlotVolume = resources.getString(com.android.internal.R.string.status_bar_volume);
+        mSlotMute = resources.getString(com.android.internal.R.string.status_bar_mute);
+        mSlotVibrate = resources.getString(com.android.internal.R.string.status_bar_volume);
         mSlotAlarmClock = resources.getString(com.android.internal.R.string.status_bar_alarm_clock);
         mSlotManagedProfile = resources.getString(
                 com.android.internal.R.string.status_bar_managed_profile);
         mSlotRotate = resources.getString(com.android.internal.R.string.status_bar_rotate);
         mSlotHeadset = resources.getString(com.android.internal.R.string.status_bar_headset);
         mSlotDataSaver = resources.getString(com.android.internal.R.string.status_bar_data_saver);
+        mSlotLocation = resources.getString(com.android.internal.R.string.status_bar_location);
+        mSlotMicrophone = resources.getString(com.android.internal.R.string.status_bar_microphone);
+        mSlotCamera = resources.getString(com.android.internal.R.string.status_bar_camera);
         mSlotSensorsOff = resources.getString(com.android.internal.R.string.status_bar_sensors_off);
         mSlotScreenRecord = resources.getString(
                 com.android.internal.R.string.status_bar_screen_record);
-        mSlotNfc = resources.getString(com.android.internal.R.string.status_bar_nfc);
 
         mDisplayId = displayId;
         mSharedPreferences = sharedPreferences;
         mDateFormatUtil = dateFormatUtil;
-
-        Dependency.get(TunerService.class).addTunable(this,
-                BLUETOOTH_SHOW_BATTERY);
-    }
-
-    @Override
-    public void onTuningChanged(String key, String newValue) {
-        switch (key) {
-            case BLUETOOTH_SHOW_BATTERY:
-                mShowBluetoothBattery =
-                        TunerService.parseIntegerSwitch(newValue, true);
-                updateBluetooth();
-                break;
-            default:
-                break;
-        }
     }
 
     /** Initialize the object after construction. */
@@ -245,12 +236,10 @@ public class PhoneStatusBarPolicy
 
         filter.addAction(AudioManager.ACTION_HEADSET_PLUG);
         filter.addAction(Intent.ACTION_SIM_STATE_CHANGED);
-        filter.addAction(BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED);
         filter.addAction(TelecomManager.ACTION_CURRENT_TTY_MODE_CHANGED);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_REMOVED);
-        filter.addAction(NfcAdapter.ACTION_ADAPTER_STATE_CHANGED);
         mBroadcastDispatcher.registerReceiverWithHandler(mIntentReceiver, filter, mHandler);
         Observer<Integer> observer = ringer -> mHandler.post(this::updateVolumeZen);
 
@@ -278,9 +267,14 @@ public class PhoneStatusBarPolicy
         mIconController.setIcon(mSlotZen, R.drawable.stat_sys_dnd, null);
         mIconController.setIconVisibility(mSlotZen, false);
 
-        // volume
-        mIconController.setIcon(mSlotVolume, R.drawable.stat_sys_ringer_vibrate, null);
-        mIconController.setIconVisibility(mSlotVolume, false);
+        // vibrate
+        mIconController.setIcon(mSlotVibrate, R.drawable.stat_sys_ringer_vibrate,
+                mResources.getString(R.string.accessibility_ringer_vibrate));
+        mIconController.setIconVisibility(mSlotVibrate, false);
+        // mute
+        mIconController.setIcon(mSlotMute, R.drawable.stat_sys_ringer_silent,
+                mResources.getString(R.string.accessibility_ringer_silent));
+        mIconController.setIconVisibility(mSlotMute, false);
         updateVolumeZen();
 
         // cast
@@ -302,6 +296,26 @@ public class PhoneStatusBarPolicy
                 mResources.getString(R.string.accessibility_data_saver_on));
         mIconController.setIconVisibility(mSlotDataSaver, false);
 
+
+        // privacy items
+        String microphoneString = mResources.getString(PrivacyType.TYPE_MICROPHONE.getNameId());
+        String microphoneDesc = mResources.getString(
+                R.string.ongoing_privacy_chip_content_multiple_apps, microphoneString);
+        mIconController.setIcon(mSlotMicrophone, PrivacyType.TYPE_MICROPHONE.getIconId(),
+                microphoneDesc);
+        mIconController.setIconVisibility(mSlotMicrophone, false);
+
+        String cameraString = mResources.getString(PrivacyType.TYPE_CAMERA.getNameId());
+        String cameraDesc = mResources.getString(
+                R.string.ongoing_privacy_chip_content_multiple_apps, cameraString);
+        mIconController.setIcon(mSlotCamera, PrivacyType.TYPE_CAMERA.getIconId(),
+                cameraDesc);
+        mIconController.setIconVisibility(mSlotCamera, false);
+
+        mIconController.setIcon(mSlotLocation, LOCATION_STATUS_ICON_ID,
+                mResources.getString(R.string.accessibility_location_active));
+        mIconController.setIconVisibility(mSlotLocation, false);
+
         // sensors off
         mIconController.setIcon(mSlotSensorsOff, R.drawable.stat_sys_sensors_off,
                 mResources.getString(R.string.accessibility_sensors_off_active));
@@ -312,12 +326,6 @@ public class PhoneStatusBarPolicy
         mIconController.setIcon(mSlotScreenRecord, R.drawable.stat_sys_screen_record, null);
         mIconController.setIconVisibility(mSlotScreenRecord, false);
 
-        mIconController.setIcon(mSlotNfc, R.drawable.stat_sys_nfc,
-                mResources.getString(R.string.accessibility_status_bar_nfc));
-
-        mIconController.setIconVisibility(mSlotNfc, false);
-        updateNfc();
-
         mRotationLockController.addCallback(this);
         mBluetooth.addCallback(this);
         mProvisionedController.addCallback(this);
@@ -327,10 +335,15 @@ public class PhoneStatusBarPolicy
         mNextAlarmController.addCallback(mNextAlarmCallback);
         mDataSaver.addCallback(this);
         mKeyguardStateController.addCallback(this);
+        mPrivacyItemController.addCallback(this);
         mSensorPrivacyController.addCallback(mSensorPrivacyListener);
+        mLocationController.addCallback(this);
         mRecordingController.addCallback(this);
 
         mCommandQueue.addCallback(this);
+
+        // Get initial user setup state
+        onUserSetupChanged();
     }
 
     @Override
@@ -365,29 +378,13 @@ public class PhoneStatusBarPolicy
         return mResources.getString(R.string.accessibility_quick_settings_alarm, dateString);
     }
 
-    private NfcAdapter getAdapter() {
-        if (mAdapter == null) {
-            try {
-                mAdapter = NfcAdapter.getNfcAdapter(mContext);
-            } catch (UnsupportedOperationException e) {
-                mAdapter = null;
-            }
-        }
-        return mAdapter;
-    }
-
-    private final void updateNfc() {
-        mIconController.setIconVisibility(mSlotNfc, getAdapter() != null && getAdapter().isEnabled());
-    }
-
     private final void updateVolumeZen() {
         boolean zenVisible = false;
         int zenIconId = 0;
         String zenDescription = null;
 
-        boolean volumeVisible = false;
-        int volumeIconId = 0;
-        String volumeDescription = null;
+        boolean vibrateVisible = false;
+        boolean muteVisible = false;
         int zen = mZenController.getZen();
 
         if (DndTile.isVisible(mSharedPreferences) || DndTile.isCombinedIcon(mSharedPreferences)) {
@@ -409,13 +406,9 @@ public class PhoneStatusBarPolicy
                     mRingerModeTracker.getRingerModeInternal().getValue();
             if (ringerModeInternal != null) {
                 if (ringerModeInternal == AudioManager.RINGER_MODE_VIBRATE) {
-                    volumeVisible = true;
-                    volumeIconId = R.drawable.stat_sys_ringer_vibrate;
-                    volumeDescription = mResources.getString(R.string.accessibility_ringer_vibrate);
+                    vibrateVisible = true;
                 } else if (ringerModeInternal == AudioManager.RINGER_MODE_SILENT) {
-                    volumeVisible = true;
-                    volumeIconId = R.drawable.stat_sys_ringer_silent;
-                    volumeDescription = mResources.getString(R.string.accessibility_ringer_silent);
+                    muteVisible = true;
                 }
             }
         }
@@ -428,13 +421,16 @@ public class PhoneStatusBarPolicy
             mZenVisible = zenVisible;
         }
 
-        if (volumeVisible) {
-            mIconController.setIcon(mSlotVolume, volumeIconId, volumeDescription);
+        if (vibrateVisible != mVibrateVisible) {
+            mIconController.setIconVisibility(mSlotVibrate, vibrateVisible);
+            mVibrateVisible = vibrateVisible;
         }
-        if (volumeVisible != mVolumeVisible) {
-            mIconController.setIconVisibility(mSlotVolume, volumeVisible);
-            mVolumeVisible = volumeVisible;
+
+        if (muteVisible != mMuteVisible) {
+            mIconController.setIconVisibility(mSlotMute, muteVisible);
+            mMuteVisible = muteVisible;
         }
+
         updateAlarm();
     }
 
@@ -457,82 +453,36 @@ public class PhoneStatusBarPolicy
             if (mBluetooth.isBluetoothConnected()
                     && (mBluetooth.isBluetoothAudioActive()
                     || !mBluetooth.isBluetoothAudioProfileOnly())) {
-                final Collection<CachedBluetoothDevice> devices = mBluetooth.getDevices();
-                if (devices != null) {
-                    // get battery level for the first device with battery level support
-                    for (CachedBluetoothDevice device : devices) {
-                        // don't get the level if still pairing
-                        if (mBluetooth.getBondState(device) == BluetoothDevice.BOND_NONE) continue;
-                        int state = device.getMaxConnectionState();
-                        if (state == BluetoothProfile.STATE_CONNECTED) {
-                            int batteryLevel = mShowBluetoothBattery ? device.getBatteryLevel() : -1;
-                            BluetoothClass type = device.getBtClass();
-                            if (batteryLevel != BluetoothDevice.BATTERY_LEVEL_UNKNOWN && showBatteryForThis(type)) {
-                                iconId = getBtLevelIconRes(batteryLevel);
-                            } else {
-                                iconId = R.drawable.stat_sys_data_bluetooth_connected;
-                            }
-                            contentDescription = mResources.getString(
-                                R.string.accessibility_bluetooth_connected);
-                            break;
-                        }
-                    }
+                int batteryLevel = mBluetooth.getBatteryLevel();
+                if (batteryLevel == 100) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_9;
+                } else if (batteryLevel >= 90) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_8;
+                } else if (batteryLevel >= 80) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_7;
+                } else if (batteryLevel >= 70) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_6;
+                } else if (batteryLevel >= 60) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_5;
+                } else if (batteryLevel >= 50) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_4;
+                } else if (batteryLevel >= 40) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_3;
+                } else if (batteryLevel >= 30) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_2;
+                } else if (batteryLevel >= 20) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_1;
+                } else if (batteryLevel >= 10) {
+                    iconId = R.drawable.stat_sys_data_bluetooth_connected_battery_0;
                 }
-	      bluetoothVisible = mBluetooth.isBluetoothEnabled();
-	    }
+                contentDescription = mResources.getString(
+                        R.string.accessibility_bluetooth_connected);
+                bluetoothVisible = mBluetooth.isBluetoothEnabled();
+            }
         }
 
         mIconController.setIcon(mSlotBluetooth, iconId, contentDescription);
         mIconController.setIconVisibility(mSlotBluetooth, bluetoothVisible);
-    }
-
-    private int getBtLevelIconRes(int batteryLevel) {
-        if (batteryLevel == 100) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_10;
-        } else if (batteryLevel >= 90) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_9;
-        } else if (batteryLevel >= 80) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_8;
-        } else if (batteryLevel >= 70) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_7;
-        } else if (batteryLevel >= 60) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_6;
-        } else if (batteryLevel >= 50) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_5;
-        } else if (batteryLevel >= 40) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_4;
-        } else if (batteryLevel >= 30) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_3;
-        } else if (batteryLevel >= 20) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_2;
-        } else if (batteryLevel >= 10) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_1;
-        } else if (batteryLevel >= 0) {
-            return R.drawable.stat_sys_data_bluetooth_connected_battery_0;
-        } else {
-            return R.drawable.stat_sys_data_bluetooth_connected;
-        }
-     }
-
-    private boolean showBatteryForThis(BluetoothClass type) {
-        boolean show = false;
-        if (type != null) {
-            switch (type.getDeviceClass()) {
-            case BluetoothClass.Device.AUDIO_VIDEO_WEARABLE_HEADSET:
-            case BluetoothClass.Device.AUDIO_VIDEO_HANDSFREE:
-            case BluetoothClass.Device.AUDIO_VIDEO_PORTABLE_AUDIO:
-            case BluetoothClass.Device.AUDIO_VIDEO_LOUDSPEAKER:
-            case BluetoothClass.Device.AUDIO_VIDEO_HEADPHONES:
-                show = true;
-                break;
-            default:
-                show = false;
-                break;
-            }
-        } else {
-            show = false;
-        }
-        return show;
     }
 
     private final void updateTTY() {
@@ -723,6 +673,63 @@ public class PhoneStatusBarPolicy
         mIconController.setIconVisibility(mSlotDataSaver, isDataSaving);
     }
 
+    @Override  // PrivacyItemController.Callback
+    public void onPrivacyItemsChanged(List<PrivacyItem> privacyItems) {
+        updatePrivacyItems(privacyItems);
+    }
+
+    private void updatePrivacyItems(List<PrivacyItem> items) {
+        boolean showCamera = false;
+        boolean showMicrophone = false;
+        boolean showLocation = false;
+        for (PrivacyItem item : items) {
+            if (item == null /* b/124234367 */) {
+                Log.e(TAG, "updatePrivacyItems - null item found");
+                StringWriter out = new StringWriter();
+                mPrivacyItemController.dump(null, new PrintWriter(out), null);
+                // Throw so we can look into this
+                throw new NullPointerException(out.toString());
+            }
+            switch (item.getPrivacyType()) {
+                case TYPE_CAMERA:
+                    showCamera = true;
+                    break;
+                case TYPE_LOCATION:
+                    showLocation = true;
+                    break;
+                case TYPE_MICROPHONE:
+                    showMicrophone = true;
+                    break;
+            }
+        }
+
+        // Disabling for now, but keeping the log
+        /*
+        mIconController.setIconVisibility(mSlotCamera, showCamera);
+        mIconController.setIconVisibility(mSlotMicrophone, showMicrophone);
+        if (mPrivacyItemController.getLocationAvailable()) {
+            mIconController.setIconVisibility(mSlotLocation, showLocation);
+        }
+         */
+        mPrivacyLogger.logStatusBarIconsVisible(showCamera, showMicrophone,  showLocation);
+    }
+
+    @Override
+    public void onLocationActiveChanged(boolean active) {
+        if (!mPrivacyItemController.getLocationAvailable()) {
+            updateLocationFromController();
+        }
+    }
+
+    // Updates the status view based on the current state of location requests.
+    private void updateLocationFromController() {
+        if (mLocationController.isLocationActive()) {
+            mIconController.setIconVisibility(mSlotLocation, true);
+        } else {
+            mIconController.setIconVisibility(mSlotLocation, false);
+        }
+    }
+
     private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -745,12 +752,6 @@ public class PhoneStatusBarPolicy
                     break;
                 case AudioManager.ACTION_HEADSET_PLUG:
                     updateHeadsetPlug(intent);
-                    break;
-                case BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED:
-                    updateBluetooth();
-                    break;
-                case NfcAdapter.ACTION_ADAPTER_STATE_CHANGED:
-                    updateNfc();
                     break;
             }
         }

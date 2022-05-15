@@ -128,7 +128,6 @@ import com.android.internal.widget.LockSettingsInternal;
 import com.android.internal.widget.LockscreenCredential;
 import com.android.internal.widget.RebootEscrowListener;
 import com.android.internal.widget.VerifyCredentialResponse;
-import com.android.server.app.AppLockManagerServiceInternal;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
 import com.android.server.SystemService;
@@ -209,6 +208,7 @@ public class LockSettingsService extends ILockSettings.Stub {
     // Order of holding lock: mSeparateChallengeLock -> mSpManager -> this
     // Do not call into ActivityManager while holding mSpManager lock.
     private final Object mSeparateChallengeLock = new Object();
+    private static final String DEFAULT_PASSWORD = "default_password";
 
     private final DeviceProvisionedObserver mDeviceProvisionedObserver =
             new DeviceProvisionedObserver();
@@ -233,6 +233,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private final KeyStore mKeyStore;
     private final java.security.KeyStore mJavaKeyStore;
+    private static String mSavePassword = DEFAULT_PASSWORD;
     private final RecoverableKeyStoreManager mRecoverableKeyStoreManager;
     private ManagedProfilePasswordCache mManagedProfilePasswordCache;
 
@@ -1310,6 +1311,45 @@ public class LockSettingsService extends ILockSettings.Stub {
         AndroidKeyStoreMaintenance.onUserPasswordChanged(userHandle, password);
     }
 
+    public void retainPassword(String password) {
+        if (LockPatternUtils.isDeviceEncryptionEnabled()) {
+            if (password != null)
+                mSavePassword = password;
+            else
+                mSavePassword = DEFAULT_PASSWORD;
+        }
+    }
+
+    public void sanitizePassword() {
+        if (LockPatternUtils.isDeviceEncryptionEnabled()) {
+            mSavePassword = DEFAULT_PASSWORD;
+        }
+    }
+
+    private boolean checkCryptKeeperPermissions() {
+        boolean permission_err = false;
+        try {
+            mContext.enforceCallingOrSelfPermission(
+                       android.Manifest.permission.CRYPT_KEEPER,
+                       "no permission to get the password");
+        } catch (SecurityException e) {
+            permission_err = true;
+        }
+        return permission_err;
+    }
+
+    public String getPassword() {
+       /** if calling process does't have crypt keeper or admin permissions,
+         * throw the exception.
+         */
+       if (checkCryptKeeperPermissions())
+            mContext.enforceCallingOrSelfPermission(
+                    android.Manifest.permission.ACCESS_KEYGUARD_SECURE_STORAGE,
+                    "no crypt_keeper or admin permission to get the password");
+
+       return mSavePassword;
+    }
+
     private void unlockKeystore(byte[] password, int userHandle) {
         if (DEBUG) Slog.v(TAG, "Unlock keystore for user: " + userHandle);
         Authorization.onLockScreenEvent(false, userHandle, password, null);
@@ -1538,6 +1578,10 @@ public class LockSettingsService extends ILockSettings.Stub {
     private boolean isManagedProfileWithSeparatedLock(int userId) {
         return mUserManager.getUserInfo(userId).isManagedProfile()
                 && getSeparateProfileChallengeEnabledInternal(userId);
+    }
+
+    public byte getLockPatternSize(int userId) {
+        return mStorage.getLockPatternSize(userId);
     }
 
     /**
@@ -2148,7 +2192,15 @@ public class LockSettingsService extends ILockSettings.Stub {
             ICheckCredentialProgressCallback progressCallback) {
         checkPasswordReadPermission();
         try {
-            return doVerifyCredential(credential, userId, progressCallback, 0 /* flags */);
+            VerifyCredentialResponse response = doVerifyCredential(credential, userId,
+                                            progressCallback, 0 /* flags */);
+            if ((response.getResponseCode() == VerifyCredentialResponse.RESPONSE_OK) &&
+                                            (userId == UserHandle.USER_OWNER)) {
+                    //TODO(b/127810705): Update to credentials to use byte[]
+                    String credentialString = credential.isNone() ? null : new String(credential.getCredential());
+                    retainPassword(credentialString);
+            }
+            return response;
         } finally {
             scheduleGc();
         }
@@ -2410,14 +2462,13 @@ public class LockSettingsService extends ILockSettings.Stub {
         mHandler.post(() -> {
             mInjector.getDevicePolicyManager().reportPasswordChanged(userId);
             LocalServices.getService(WindowManagerInternal.class).reportPasswordChanged(userId);
-            LocalServices.getService(AppLockManagerServiceInternal.class).reportPasswordChanged(userId);
         });
     }
 
-    private LockscreenCredential createPattern(String patternString) {
+    private LockscreenCredential createPattern(String patternString, byte patternSize) {
         final byte[] patternBytes = patternString.getBytes();
         LockscreenCredential pattern = LockscreenCredential.createPattern(
-                LockPatternUtils.byteArrayToPattern(patternBytes));
+                LockPatternUtils.byteArrayToPattern(patternBytes, patternSize), patternSize);
         Arrays.fill(patternBytes, (byte) 0);
         return pattern;
     }
@@ -2460,7 +2511,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             final LockscreenCredential credential;
             switch (getCredentialTypeInternal(userId)) {
                 case CREDENTIAL_TYPE_PATTERN:
-                    credential = createPattern(password);
+                    credential = createPattern(password, mStorage.getLockPatternSize(userId));
                     break;
                 case CREDENTIAL_TYPE_PIN:
                     credential = LockscreenCredential.createPin(password);
@@ -2706,7 +2757,10 @@ public class LockSettingsService extends ILockSettings.Stub {
             Secure.LOCK_PATTERN_ENABLED,
             Secure.LOCK_BIOMETRIC_WEAK_FLAGS,
             Secure.LOCK_PATTERN_VISIBLE,
-            Secure.LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED
+            Secure.LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED,
+            Secure.LOCK_PATTERN_SIZE,
+            Secure.LOCK_DOTS_VISIBLE,
+            Secure.LOCK_SHOW_ERROR_PATH
     };
 
     // Reading these settings needs the contacts permission

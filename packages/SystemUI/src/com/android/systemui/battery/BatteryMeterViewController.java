@@ -15,9 +15,7 @@
  */
 package com.android.systemui.battery;
 
-import static android.provider.Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME;
-import static android.provider.Settings.System.SHOW_BATTERY_PERCENT;
-import static android.provider.Settings.System.QS_SHOW_BATTERY_ESTIMATE;
+import static ouvriros.providers.OuvrirSettings.System.STATUS_BAR_SHOW_BATTERY_PERCENT;
 
 import android.app.ActivityManager;
 import android.content.ContentResolver;
@@ -38,9 +36,9 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.ViewController;
 
-import javax.inject.Inject;
+import ouvriros.providers.OuvrirSettings;
 
-import static android.provider.Settings.Secure.STATUS_BAR_BATTERY_STYLE;
+import javax.inject.Inject;
 
 /** Controller for {@link BatteryMeterView}. **/
 public class BatteryMeterViewController extends ViewController<BatteryMeterView> {
@@ -52,15 +50,6 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
     private final String mSlotBattery;
     private final SettingObserver mSettingObserver;
     private final CurrentUserTracker mCurrentUserTracker;
-
-    private static final int BATTERY_STYLE_PORTRAIT = 0;
-    private static final int BATTERY_STYLE_CIRCLE = 1;
-    private static final int BATTERY_STYLE_DOTTED_CIRCLE = 2;
-    private static final int BATTERY_STYLE_FULL_CIRCLE = 3;
-    private static final int BATTERY_STYLE_TEXT = 4;
-
-    private int mBatteryStyle = BATTERY_STYLE_PORTRAIT;
-    private boolean mBatteryHidden;
 
     private final ConfigurationController.ConfigurationListener mConfigurationListener =
             new ConfigurationController.ConfigurationListener() {
@@ -78,9 +67,11 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
                         getContext(), newValue);
                 mBatteryHidden = icons.contains(mSlotBattery);
                 mView.setVisibility(mBatteryHidden ? View.GONE : View.VISIBLE);
-            } else if (STATUS_BAR_BATTERY_STYLE.equals(key)) {
-                mBatteryStyle = TunerService.parseInteger(newValue, BATTERY_STYLE_PORTRAIT);
-                mView.tunerBatteryStyle(mBatteryStyle);
+            } else if (BatteryMeterView.STATUS_BAR_BATTERY_STYLE.equals(key)) {
+                if (!mBatteryHidden) {
+                    mView.setBatteryStyle(TunerService.parseInteger(newValue,
+                            BatteryMeterView.BATTERY_STYLE_PORTRAIT));
+                }
             }
         }
     };
@@ -89,7 +80,7 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
             new BatteryController.BatteryStateChangeCallback() {
                 @Override
                 public void onBatteryLevelChanged(int level, boolean pluggedIn, boolean charging) {
-                    mView.onBatteryLevelChanged(level, pluggedIn, charging);
+                    mView.onBatteryLevelChanged(level, pluggedIn);
                 }
 
                 @Override
@@ -106,6 +97,8 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
     // Some places may need to show the battery conditionally, and not obey the tuner
     private boolean mIgnoreTunerUpdates;
     private boolean mIsSubscribedForTunerUpdates;
+
+    private boolean mBatteryHidden;
 
     @Inject
     public BatteryMeterViewController(
@@ -144,7 +137,6 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
 
         registerShowBatteryPercentObserver(ActivityManager.getCurrentUser());
         registerGlobalBatteryUpdateObserver();
-        registerUserSettingsObservers();
         mCurrentUserTracker.startTracking();
 
         mView.updateShowPercent();
@@ -174,7 +166,8 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
             return;
         }
 
-        mTunerService.addTunable(mTunable, StatusBarIconController.ICON_HIDE_LIST, STATUS_BAR_BATTERY_STYLE);
+        mTunerService.addTunable(mTunable, StatusBarIconController.ICON_HIDE_LIST,
+                BatteryMeterView.STATUS_BAR_BATTERY_STYLE);
         mIsSubscribedForTunerUpdates = true;
     }
 
@@ -189,7 +182,7 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
 
     private void registerShowBatteryPercentObserver(int user) {
         mContentResolver.registerContentObserver(
-                Settings.System.getUriFor(SHOW_BATTERY_PERCENT),
+                OuvrirSettings.System.getUriFor(STATUS_BAR_SHOW_BATTERY_PERCENT),
                 false,
                 mSettingObserver,
                 user);
@@ -202,13 +195,6 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
                 mSettingObserver);
     }
 
-    private void registerUserSettingsObservers() {
-        mContentResolver.registerContentObserver(
-                Settings.System.getUriFor(QS_SHOW_BATTERY_ESTIMATE),
-                false,
-                mSettingObserver);
-    }
-
     private final class SettingObserver extends ContentObserver {
         public SettingObserver(Handler handler) {
             super(handler);
@@ -217,17 +203,11 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
         @Override
         public void onChange(boolean selfChange, Uri uri) {
             super.onChange(selfChange, uri);
-            switch (uri.getLastPathSegment()) {
-                case BATTERY_ESTIMATES_LAST_UPDATE_TIME:
-                    // update the text for sure if the estimate in the cache was updated
-                    mView.updatePercentText();
-                    break;
-                case SHOW_BATTERY_PERCENT:
-                    mView.updateShowPercent();
-                    break;
-                case QS_SHOW_BATTERY_ESTIMATE:
-                    mView.updatePercentView();
-                    break;
+            mView.updateShowPercent();
+            if (TextUtils.equals(uri.getLastPathSegment(),
+                    Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME)) {
+                // update the text for sure if the estimate in the cache was updated
+                mView.updatePercentText();
             }
         }
     }

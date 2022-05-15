@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 The CyanogenMod Project
- * Copyright (c) 2017 The LineageOS Project
+ * Copyright (c) 2017 The OuvrirOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 
 package com.android.systemui.qs.tiles;
 
+import static com.android.internal.logging.MetricsLogger.VIEW_UNKNOWN;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -32,17 +34,16 @@ import android.view.View;
 import androidx.annotation.Nullable;
 
 import com.android.internal.logging.MetricsLogger;
-import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.systemui.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
-import com.android.systemui.qs.QSHost;
-import com.android.systemui.qs.logging.QSLogger;
-import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QSTile.BooleanState;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
-import com.android.systemui.R;
+import com.android.systemui.qs.QSHost;
+import com.android.systemui.qs.logging.QSLogger;
+import com.android.systemui.qs.tileimpl.QSTileImpl;
 
 import javax.inject.Inject;
 
@@ -60,6 +61,7 @@ public class CaffeineTile extends QSTileImpl<BooleanState> {
         30 * 60,  // 30 min
         -1,       // infinity
     };
+    private static final int INFINITE_DURATION_INDEX = DURATIONS.length - 1;
     private CountDownTimer mCountdownTimer = null;
     public long mLastClickTime = -1;
     private final Receiver mReceiver = new Receiver();
@@ -98,7 +100,11 @@ public class CaffeineTile extends QSTileImpl<BooleanState> {
     }
 
     @Override
-    public void handleClick(@Nullable View view) {
+    public void handleSetListening(boolean listening) {
+    }
+
+    @Override
+    protected void handleClick(@Nullable View view) {
         // If last user clicks < 5 seconds
         // we cycle different duration
         // otherwise toggle on/off
@@ -137,18 +143,15 @@ public class CaffeineTile extends QSTileImpl<BooleanState> {
 
     @Override
     protected void handleLongClick(@Nullable View view) {
-        // Set duration to infinity on long click
-        int infinityIndex = DURATIONS.length - 1;
-        if (mLastClickTime == infinityIndex) {
-            // Already at infinity
-            return;
-        }
-        mDuration = infinityIndex;
-        startCountDown(DURATIONS[mDuration]);
-        if (!mWakeLock.isHeld()) {
+        if (mWakeLock.isHeld()) {
+            if (mDuration == INFINITE_DURATION_INDEX) {
+                return;
+            }
+        } else {
             mWakeLock.acquire();
         }
-        mLastClickTime = SystemClock.elapsedRealtime();
+        mDuration = INFINITE_DURATION_INDEX;
+        startCountDown(DURATIONS[INFINITE_DURATION_INDEX]);
         refreshState();
     }
 
@@ -164,7 +167,7 @@ public class CaffeineTile extends QSTileImpl<BooleanState> {
 
     @Override
     public int getMetricsCategory() {
-        return MetricsEvent.CUSTOM_TILES;
+        return VIEW_UNKNOWN;
     }
 
     private void startCountDown(long duration) {

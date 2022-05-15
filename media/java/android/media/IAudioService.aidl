@@ -110,8 +110,6 @@ interface IAudioService {
     @UnsupportedAppUsage
     int getStreamMaxVolume(int streamType);
 
-    void setStreamMaxVolume(int streamType, int maxVol);
-
     List<AudioVolumeGroup> getAudioVolumeGroups();
 
     void setVolumeIndexForAttributes(in AudioAttributes aa, int index, int flags, String callingPackage);
@@ -452,11 +450,4 @@ interface IAudioService {
     void registerSpatializerOutputCallback(in ISpatializerOutputCallback cb);
 
     void unregisterSpatializerOutputCallback(in ISpatializerOutputCallback cb);
-
-    /**
-     * Internal api to protect Pulse
-     * @hide
-     */
-    void setVisualizerLocked(boolean doLock);
-    boolean isVisualizerLocked(String callingPackage);
 }

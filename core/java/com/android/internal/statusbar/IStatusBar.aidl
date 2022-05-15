@@ -40,7 +40,6 @@ oneway interface IStatusBar
     void animateExpandSettingsPanel(String subPanel);
     void animateCollapsePanels();
     void togglePanel();
-    void toggleSettingsPanel();
 
     void showWirelessChargingAnimation(int batteryLevel);
 
@@ -143,7 +142,7 @@ oneway interface IStatusBar
     void showPinningEnterExitToast(boolean entering);
     void showPinningEscapeToast();
 
-    void showShutdownUi(boolean isReboot, String reason, boolean advancedReboot);
+    void showShutdownUi(boolean isReboot, String reason, boolean rebootCustom);
 
     /**
     * Used to show the authentication dialog (Biometrics, Device Credential).
@@ -289,17 +288,4 @@ oneway interface IStatusBar
      * Triggers a GC in the system and status bar.
      */
     void runGcForTest();
-
-    /**
-     * Evolution X additions
-     */
-    void toggleCameraFlash();
-    void killForegroundApp();
-    void screenPinningStateChanged(boolean enabled);
-    void leftInLandscapeChanged(boolean isLeft);
-
-    /**
-     * Used to block or unblock usage of gestural navigation
-     */
-    void setBlockedGesturalNavigation(boolean blocked);
 }

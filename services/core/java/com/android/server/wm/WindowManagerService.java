@@ -3488,22 +3488,18 @@ public class WindowManagerService extends IWindowManager.Stub
 
     // Called by window manager policy.  Not exposed externally.
     @Override
+    public void reboot(boolean confirm, String reason) {
+        // Pass in the UI context, since ShutdownThread requires it (to show UI).
+        ShutdownThread.rebootCustom(ActivityThread.currentActivityThread().getSystemUiContext(),
+                reason, confirm);
+    }
+
+    // Called by window manager policy.  Not exposed externally.
+    @Override
     public void rebootSafeMode(boolean confirm) {
         // Pass in the UI context, since ShutdownThread requires it (to show UI).
         ShutdownThread.rebootSafeMode(ActivityThread.currentActivityThread().getSystemUiContext(),
                 confirm);
-    }
-
-    // Called by window manager policy.  Not exposed externally.
-    @Override
-    public void reboot(String reason, boolean confirm) {
-        ShutdownThread.reboot(ActivityThread.currentActivityThread().getSystemUiContext(), reason, confirm);
-    }
-
-    // Called by window manager policy.  Not exposed externally.
-    @Override
-    public void advancedReboot(String reason, boolean confirm) {
-        ShutdownThread.advancedReboot(ActivityThread.currentActivityThread().getSystemUiContext(), reason, confirm);
     }
 
     public void setCurrentProfileIds(final int[] currentProfileIds) {
@@ -6252,11 +6248,6 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             return dc.getDisplayPolicy().hasNavigationBar();
         }
-    }
-
-    @Override
-    public void sendCustomAction(Intent intent) {
-        mPolicy.sendCustomAction(intent);
     }
 
     @Override

@@ -75,6 +75,8 @@ interface INotificationManager
     boolean areNotificationsEnabledForPackage(String pkg, int uid);
     boolean areNotificationsEnabled(String pkg);
     int getPackageImportance(String pkg);
+    void setNotificationSoundTimeout(String pkg, int uid, long timeout);
+    long getNotificationSoundTimeout(String pkg, int uid);
 
     List<String> getAllowedAssistantAdjustments(String pkg);
     void allowAssistantAdjustment(String adjustmentType);
@@ -233,7 +235,4 @@ interface INotificationManager
     void migrateNotificationFilter(in INotificationListener token, int defaultTypes, in List<String> disallowedPkgs);
 
     void setToastRateLimitingEnabled(boolean enable);
-
-    void forceShowLedLight(int color);
-    void forcePulseLedLight(int color, int onTime, int offTime);
 }

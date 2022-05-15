@@ -29,7 +29,6 @@ import android.os.Trace;
 import android.util.Log;
 import android.util.MathUtils;
 import android.util.Pair;
-import android.view.CrossWindowBlurListeners;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
@@ -152,8 +151,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
      */
     public static final float BUSY_SCRIM_ALPHA = 1f;
 
-    public static float QS_CLIP_SCRIM_ALPHA = 0.80f;
-
     /**
      * Scrim opacity that can have text on top.
      */
@@ -183,7 +180,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     private UnlockedScreenOffAnimationController mUnlockedScreenOffAnimationController;
 
     private GradientColors mColors;
-    private GradientColors mBehindColors;
     private boolean mNeedsDrawableColorUpdate;
 
     private float mScrimBehindAlphaKeyguard = KEYGUARD_SCRIM_ALPHA;
@@ -242,8 +238,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             PanelExpansionStateManager panelExpansionStateManager) {
         mScrimStateListener = lightBarController::setScrimState;
         mDefaultScrimAlpha = BUSY_SCRIM_ALPHA;
-        CrossWindowBlurListeners mBlurSupport = CrossWindowBlurListeners.getInstance();
-        QS_CLIP_SCRIM_ALPHA = mBlurSupport.isCrossWindowBlurEnabled() ? 0.8f : 1.0f;
 
         mKeyguardStateController = keyguardStateController;
         mDarkenWhileDragging = !mKeyguardStateController.canDismissLockScreen();
@@ -282,7 +276,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         );
 
         mColors = new GradientColors();
-        mBehindColors = new GradientColors();
     }
 
     /**
@@ -308,7 +301,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             states[i].init(mScrimInFront, mScrimBehind, mDozeParameters, mDockManager);
             states[i].setScrimBehindAlphaKeyguard(mScrimBehindAlphaKeyguard);
             states[i].setDefaultScrimAlpha(mDefaultScrimAlpha);
-            states[i].setQSClipScrimAlpha(QS_CLIP_SCRIM_ALPHA);
         }
 
         mScrimBehind.setDefaultFocusHighlightEnabled(false);
@@ -680,8 +672,8 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
                 float behindFraction = getInterpolatedFraction();
                 behindFraction = (float) Math.pow(behindFraction, 0.8f);
                 if (mClipsQsScrim) {
-                    mBehindAlpha = QS_CLIP_SCRIM_ALPHA;
-                    mNotificationsAlpha = behindFraction * QS_CLIP_SCRIM_ALPHA;
+                    mBehindAlpha = 1;
+                    mNotificationsAlpha = behindFraction * mDefaultScrimAlpha;
                 } else {
                     mBehindAlpha = behindFraction * mDefaultScrimAlpha;
                     mNotificationsAlpha = mBehindAlpha;
@@ -711,8 +703,8 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             if (mClipsQsScrim) {
                 mNotificationsAlpha = behindAlpha;
                 mNotificationsTint = behindTint;
-                mBehindAlpha = QS_CLIP_SCRIM_ALPHA;
-                mBehindTint = Color.TRANSPARENT;
+                mBehindAlpha = 1;
+                mBehindTint = Color.BLACK;
             } else {
                 mBehindAlpha = behindAlpha;
                 if (mState == ScrimState.SHADE_LOCKED) {
@@ -764,7 +756,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         float behindAlpha;
         int behindTint;
         if (mDarkenWhileDragging) {
-            behindAlpha = MathUtils.lerp(QS_CLIP_SCRIM_ALPHA, stateBehind,
+            behindAlpha = MathUtils.lerp(mDefaultScrimAlpha, stateBehind,
                     interpolatedFract);
         } else {
             behindAlpha = MathUtils.lerp(0 /* start */, stateBehind,
@@ -778,7 +770,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
                     state.getBehindTint(), interpolatedFract);
         }
         if (mQsExpansion > 0) {
-            behindAlpha = MathUtils.lerp(behindAlpha, QS_CLIP_SCRIM_ALPHA, mQsExpansion);
+            behindAlpha = MathUtils.lerp(behindAlpha, mDefaultScrimAlpha, mQsExpansion);
             int stateTint = mClipsQsScrim ? ScrimState.SHADE_LOCKED.getNotifTint()
                     : ScrimState.SHADE_LOCKED.getBehindTint();
             behindTint = ColorUtils.blendARGB(behindTint, stateTint, mQsExpansion);
@@ -882,7 +874,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
                     && !mBlankScreen;
 
             mScrimInFront.setColors(mColors, animateScrimInFront);
-            mScrimBehind.setColors(mBehindColors, animateBehindScrim);
+            mScrimBehind.setColors(mColors, animateBehindScrim);
             mNotificationsScrim.setColors(mColors, animateScrimNotifications);
 
             dispatchBackScrimState(mScrimBehind.getViewAlpha());
@@ -1223,17 +1215,10 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         int background = Utils.getColorAttr(mScrimBehind.getContext(),
                 android.R.attr.colorBackgroundFloating).getDefaultColor();
         int accent = Utils.getColorAccent(mScrimBehind.getContext()).getDefaultColor();
-
         mColors.setMainColor(background);
         mColors.setSecondaryColor(accent);
         mColors.setSupportsDarkText(
                 ColorUtils.calculateContrast(mColors.getMainColor(), Color.WHITE) > 4.5);
-
-        mBehindColors.setMainColor(background);
-        mBehindColors.setSecondaryColor(accent);
-        mBehindColors.setSupportsDarkText(
-                ColorUtils.calculateContrast(mBehindColors.getMainColor(), Color.WHITE) > 4.5);
-
         mNeedsDrawableColorUpdate = true;
     }
 

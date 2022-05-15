@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 The CyanogenMod Project
+ * Copyright (C) 2017 The OuvrirOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +17,8 @@
 
 package com.android.systemui.qs.tiles;
 
-import android.content.ComponentName;
+import static com.android.internal.logging.MetricsLogger.VIEW_UNKNOWN;
+
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,35 +30,29 @@ import android.view.View;
 import androidx.annotation.Nullable;
 
 import com.android.internal.logging.MetricsLogger;
-
-import com.android.systemui.qs.GlobalSetting;
-import com.android.systemui.qs.QSHost;
-import com.android.systemui.qs.tileimpl.QSTileImpl;
-import com.android.systemui.plugins.qs.QSTile.BooleanState;
 import com.android.systemui.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
+import com.android.systemui.plugins.qs.QSTile.BooleanState;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.qs.GlobalSetting;
+import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.logging.QSLogger;
-
-import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.systemui.qs.tileimpl.QSTileImpl;
 
 import javax.inject.Inject;
 
 /** Quick settings tile: Heads up **/
 public class HeadsUpTile extends QSTileImpl<BooleanState> {
 
-    private final GlobalSetting mSetting;
-
     private final Icon mIcon = ResourceIcon.get(R.drawable.ic_qs_heads_up);
 
-    private static final ComponentName HEADS_UP_SETTINGS_COMPONENT = new ComponentName(
-            "com.android.settings", "com.android.settings.Settings$HeadsUpSettingsActivity");
+    private static final Intent NOTIFICATION_SETTINGS =
+            new Intent("android.settings.NOTIFICATION_SETTINGS");
 
-    private static final Intent HEADS_UP_SETTINGS =
-            new Intent().setComponent(HEADS_UP_SETTINGS_COMPONENT);
+    private final GlobalSetting mSetting;
 
     @Inject
     public HeadsUpTile(
@@ -93,12 +89,7 @@ public class HeadsUpTile extends QSTileImpl<BooleanState> {
 
     @Override
     public Intent getLongClickIntent() {
-        return HEADS_UP_SETTINGS;
-    }
-
-    @Override
-    public CharSequence getTileLabel() {
-        return mContext.getString(R.string.quick_settings_heads_up_label);
+        return NOTIFICATION_SETTINGS;
     }
 
     private void setEnabled(boolean enabled) {
@@ -109,43 +100,39 @@ public class HeadsUpTile extends QSTileImpl<BooleanState> {
 
     @Override
     protected void handleUpdateState(BooleanState state, Object arg) {
-
-        if (state.slash == null) {
-            state.slash = new SlashState();
-        }
-        state.icon = mIcon;
-
-        final int value = arg instanceof Integer ? (Integer)arg : mSetting.getValue();
+        final int value = arg instanceof Integer ? (Integer) arg : mSetting.getValue();
         final boolean headsUp = value != 0;
         state.value = headsUp;
         state.label = mContext.getString(R.string.quick_settings_heads_up_label);
+        state.icon = mIcon;
         if (headsUp) {
             state.contentDescription =  mContext.getString(
                     R.string.accessibility_quick_settings_heads_up_on);
-            state.slash.isSlashed = false;
             state.state = Tile.STATE_ACTIVE;
         } else {
             state.contentDescription =  mContext.getString(
                     R.string.accessibility_quick_settings_heads_up_off);
-            state.slash.isSlashed = true;
             state.state = Tile.STATE_INACTIVE;
         }
     }
 
     @Override
+    public CharSequence getTileLabel() {
+        return mContext.getString(R.string.quick_settings_heads_up_label);
+    }
+
+    @Override
     protected String composeChangeAnnouncement() {
         if (mState.value) {
-            return mContext.getString(
-                    R.string.accessibility_quick_settings_heads_up_changed_on);
+            return mContext.getString(R.string.accessibility_quick_settings_heads_up_changed_on);
         } else {
-            return mContext.getString(
-                    R.string.accessibility_quick_settings_heads_up_changed_off);
+            return mContext.getString(R.string.accessibility_quick_settings_heads_up_changed_off);
         }
     }
 
     @Override
     public int getMetricsCategory() {
-        return MetricsEvent.CUSTOM_TILES;
+        return VIEW_UNKNOWN;
     }
 
     @Override

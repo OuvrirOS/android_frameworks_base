@@ -50,11 +50,10 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
 
     private Listener mListener;
     private ToggleSlider mMirror;
+    private ImageView mIcon;
     private BrightnessMirrorController mMirrorController;
     private boolean mTracking;
     private final FalsingManager mFalsingManager;
-
-    private ImageView mIconView;
 
     private final Gefingerpoken mOnInterceptListener = new Gefingerpoken() {
         @Override
@@ -75,11 +74,10 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
 
     BrightnessSliderController(
             BrightnessSliderView brightnessSliderView,
-            ImageView icon,
             FalsingManager falsingManager) {
         super(brightnessSliderView);
-        mIconView = icon;
         mFalsingManager = falsingManager;
+        mIcon = mView.findViewById(R.id.brightness_icon);
     }
 
     /**
@@ -89,8 +87,8 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
         return mView;
     }
 
-    public ImageView getIconView() {
-        return mIconView;
+    public ImageView getIcon() {
+        return mIcon;
     }
 
     @Override
@@ -202,8 +200,8 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
         return mView.isVisibleToUser();
     }
 
-    private final BrightnessSliderView.OnBrightnessSliderChangedListener mSeekListener =
-            new BrightnessSliderView.OnBrightnessSliderChangedListener() {
+    private final SeekBar.OnSeekBarChangeListener mSeekListener =
+            new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
             if (mListener != null) {
@@ -262,8 +260,7 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
             int layout = getLayout();
             BrightnessSliderView root = (BrightnessSliderView) LayoutInflater.from(context)
                     .inflate(layout, viewRoot, false);
-            ImageView icon = (ImageView) root.findViewById(R.id.brightness_icon);
-            return new BrightnessSliderController(root, icon, mFalsingManager);
+            return new BrightnessSliderController(root, mFalsingManager);
         }
 
         /** Get the layout to inflate based on what slider to use */

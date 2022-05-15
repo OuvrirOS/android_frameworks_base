@@ -480,13 +480,6 @@ public final class PowerManager {
     public static final int GO_TO_SLEEP_FLAG_NO_DOZE = 1 << 0;
 
     /**
-     * Force sleep flag: Skip current state check
-     * that allows e.g. to go from aod (doze) to sleep without wake up
-     * @hide
-     */
-    public static final int GO_TO_SLEEP_FLAG_FORCE = 1 << 1;
-
-    /**
      * @hide
      */
     @IntDef(prefix = { "BRIGHTNESS_CONSTRAINT_TYPE" }, value = {
@@ -497,7 +490,9 @@ public final class PowerManager {
             BRIGHTNESS_CONSTRAINT_TYPE_DOZE,
             BRIGHTNESS_CONSTRAINT_TYPE_MINIMUM_VR,
             BRIGHTNESS_CONSTRAINT_TYPE_MAXIMUM_VR,
-            BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_VR
+            BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_VR,
+            BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_BUTTON,
+            BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_KEYBOARD
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface BrightnessConstraint{}
@@ -548,6 +543,18 @@ public final class PowerManager {
      * @hide
      */
     public static final int BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_VR = 7;
+
+    /**
+     * Brightness constraint type: minimum allowed value.
+     * @hide
+     */
+    public static final int BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_BUTTON = 8;
+
+    /**
+     * Brightness constraint type: minimum allowed value.
+     * @hide
+     */
+    public static final int BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_KEYBOARD = 9;
 
     /**
      * @hide
@@ -721,16 +728,6 @@ public final class PowerManager {
 
     /**
      * The value to pass as the 'reason' argument to reboot() to reboot into
-     * bootloader mode if you need to get to the choppa (cit)
-     * <p>
-     * Requires {@link android.Manifest.permission#REBOOT}).
-     * </p>
-     * @hide
-     */
-    public static final String REBOOT_BOOTLOADER = "bootloader";
-
-    /**
-     * The value to pass as the 'reason' argument to reboot() to reboot into
      * recovery mode for applying system updates.
      * <p>
      * Requires the {@link android.Manifest.permission#RECOVERY}
@@ -740,6 +737,27 @@ public final class PowerManager {
      * @hide
      */
     public static final String REBOOT_RECOVERY_UPDATE = "recovery-update";
+
+    /**
+     * The value to pass as the 'reason' argument to reboot() to
+     * reboot into bootloader mode
+     * @hide
+     */
+    public static final String REBOOT_BOOTLOADER = "bootloader";
+
+    /**
+     * The value to pass as the 'reason' argument to reboot() to
+     * reboot into download mode
+     * @hide
+     */
+    public static final String REBOOT_DOWNLOAD = "download";
+
+    /**
+     * The value to pass as the 'reason' argument to reboot() to
+     * reboot into fastboot mode
+     * @hide
+     */
+    public static final String REBOOT_FASTBOOT = "fastboot";
 
     /**
      * The value to pass as the 'reason' argument to reboot() when device owner requests a reboot on
@@ -1525,8 +1543,7 @@ public final class PowerManager {
     }
 
     /**
-     * Forces the device to wake up from sleep only if
-     * nothing is blocking the proximity sensor
+     * Forces the device to wake up from sleep only if nothing is blocking the proximity sensor.
      *
      * @see #wakeUp
      *
@@ -1744,6 +1761,24 @@ public final class PowerManager {
     }
 
     /**
+     * Reboot the device.  Will not return if the reboot is successful.
+     * <p>
+     * Requires the {@link android.Manifest.permission#REBOOT} permission.
+     * </p>
+     *
+     * @param reason code to pass to the kernel (e.g., "recovery", "bootloader", "download") to
+     *               request special boot modes, or null.
+     * @hide
+     */
+    public void rebootCustom(String reason) {
+        try {
+            mService.rebootCustom(false, reason, true);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Reboot the device. Will not return if the reboot is successful.
      * <p>
      * Requires the {@link android.Manifest.permission#REBOOT} permission.
@@ -1756,24 +1791,6 @@ public final class PowerManager {
             mService.rebootSafeMode(false, true);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Reboot the device with custom progress meassges.
-     * Will not return if the reboot is successful.
-     * <p>
-     * Requires the {@link android.Manifest.permission#REBOOT} permission.
-     * </p>
-     *
-     * @param reason code to pass to the kernel (e.g., "recovery") to
-     *               request special boot modes, or null.
-     * @hide
-     */
-    public void advancedReboot(String reason) {
-        try {
-            mService.advancedReboot(false, reason, true);
-        } catch (RemoteException e) {
         }
     }
 
@@ -2418,6 +2435,18 @@ public final class PowerManager {
             return forecast;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public void setKeyboardVisibility(boolean visible) {
+        try {
+            if (mService != null) {
+                mService.setKeyboardVisibility(visible);
+            }
+        } catch (RemoteException e) {
         }
     }
 

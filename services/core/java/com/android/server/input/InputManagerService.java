@@ -121,6 +121,8 @@ import com.android.server.LocalServices;
 import com.android.server.Watchdog;
 import com.android.server.policy.WindowManagerPolicy;
 
+import ouvriros.providers.OuvrirSettings;
+
 import libcore.io.IoUtils;
 import libcore.io.Streams;
 
@@ -316,6 +318,7 @@ public class InputManagerService extends IInputManager.Stub
     private static native boolean nativeTransferTouch(long ptr, IBinder destChannelToken);
     private static native void nativeSetPointerSpeed(long ptr, int speed);
     private static native void nativeSetShowTouches(long ptr, boolean enabled);
+    private static native void nativeSetVolumeKeysRotation(long ptr, int mode);
     private static native void nativeSetInteractive(long ptr, boolean interactive);
     private static native void nativeReloadCalibration(long ptr);
     private static native void nativeVibrate(long ptr, int deviceId, long[] pattern,
@@ -486,6 +489,7 @@ public class InputManagerService extends IInputManager.Stub
         registerLongPressTimeoutObserver();
         registerMaximumObscuringOpacityForTouchSettingObserver();
         registerBlockUntrustedTouchesModeSettingObserver();
+        registerVolumeKeysRotationSettingObserver();
 
         mContext.registerReceiver(new BroadcastReceiver() {
             @Override
@@ -494,6 +498,7 @@ public class InputManagerService extends IInputManager.Stub
                 updateShowTouchesFromSettings();
                 updateAccessibilityLargePointerFromSettings();
                 updateDeepPressStatusFromSettings("user switched");
+                updateVolumeKeysRotationFromSettings();
             }
         }, new IntentFilter(Intent.ACTION_USER_SWITCHED), null, mHandler);
 
@@ -503,6 +508,7 @@ public class InputManagerService extends IInputManager.Stub
         updateDeepPressStatusFromSettings("just booted");
         updateMaximumObscuringOpacityForTouchFromSettings();
         updateBlockUntrustedTouchesModeFromSettings();
+        updateVolumeKeysRotationFromSettings();
     }
 
     // TODO(BT) Pass in parameter for bluetooth system
@@ -2066,6 +2072,33 @@ public class InputManagerService extends IInputManager.Stub
         return v;
     }
 
+    public void updateVolumeKeysRotationFromSettings() {
+        int mode = getVolumeKeysRotationSetting(0);
+        nativeSetVolumeKeysRotation(mPtr, mode);
+    }
+
+    public void registerVolumeKeysRotationSettingObserver() {
+        mContext.getContentResolver().registerContentObserver(
+                OuvrirSettings.System.getUriFor(
+                        OuvrirSettings.System.SWAP_VOLUME_KEYS_ON_ROTATION), false,
+                new ContentObserver(mHandler) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        updateVolumeKeysRotationFromSettings();
+                    }
+                });
+    }
+
+    private int getVolumeKeysRotationSetting(int defaultValue) {
+        int result = defaultValue;
+        try {
+            result = OuvrirSettings.System.getIntForUser(mContext.getContentResolver(),
+                    OuvrirSettings.System.SWAP_VOLUME_KEYS_ON_ROTATION, UserHandle.USER_CURRENT);
+        } catch (OuvrirSettings.OuvrirSettingNotFoundException snfe) {
+        }
+        return result;
+    }
+
     // Binder call
     @Override
     public void vibrate(int deviceId, VibrationEffect effect, IBinder token) {
@@ -2872,7 +2905,8 @@ public class InputManagerService extends IInputManager.Stub
         };
         for (File baseDir: baseDirs) {
             File confFile = new File(baseDir, EXCLUDED_DEVICES_PATH);
-            try (InputStream stream = new FileInputStream(confFile)) {
+            try {
+                InputStream stream = new FileInputStream(confFile);
                 names.addAll(ConfigurationProcessor.processExcludedDeviceNames(stream));
             } catch (FileNotFoundException e) {
                 // It's ok if the file does not exist.
@@ -2905,7 +2939,8 @@ public class InputManagerService extends IInputManager.Stub
         final File baseDir = Environment.getVendorDirectory();
         final File confFile = new File(baseDir, PORT_ASSOCIATIONS_PATH);
 
-        try (final InputStream stream = new FileInputStream(confFile)) {
+        try {
+            final InputStream stream = new FileInputStream(confFile);
             return ConfigurationProcessor.processInputPortAssociations(stream);
         } catch (FileNotFoundException e) {
             // Most of the time, file will not exist, which is expected.
@@ -3045,10 +3080,10 @@ public class InputManagerService extends IInputManager.Stub
             @Override
             public void visitKeyboardLayout(Resources resources,
                     int keyboardLayoutResId, KeyboardLayout layout) {
-                try (final InputStreamReader stream = new InputStreamReader(
-                               resources.openRawResource(keyboardLayoutResId))) {
+                try {
                     result[0] = layout.getDescriptor();
-                    result[1] = Streams.readFully(stream);
+                    result[1] = Streams.readFully(new InputStreamReader(
+                            resources.openRawResource(keyboardLayoutResId)));
                 } catch (IOException ex) {
                 } catch (NotFoundException ex) {
                 }

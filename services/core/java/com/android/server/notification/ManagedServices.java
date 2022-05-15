@@ -146,7 +146,6 @@ abstract public class ManagedServices {
 
     // lists the component names of all enabled (and therefore potentially connected)
     // app services for current profiles.
-    private final Object mEnabledServicesLock = new Object();
     private ArraySet<ComponentName> mEnabledServicesForCurrentProfiles
             = new ArraySet<>();
     // Just the packages from mEnabledServicesForCurrentProfiles
@@ -369,14 +368,13 @@ abstract public class ManagedServices {
             }
         }
 
-        synchronized (mEnabledServicesLock) {
-            pw.println("    All " + getCaption() + "s (" + mEnabledServicesForCurrentProfiles.size()
-                    + ") enabled for current profiles:");
-            for (ComponentName cmpt : mEnabledServicesForCurrentProfiles) {
-                if (filter != null && !filter.matches(cmpt)) continue;
-                pw.println("      " + cmpt);
-            }
+        pw.println("    All " + getCaption() + "s (" + mEnabledServicesForCurrentProfiles.size()
+                + ") enabled for current profiles:");
+        for (ComponentName cmpt : mEnabledServicesForCurrentProfiles) {
+            if (filter != null && !filter.matches(cmpt)) continue;
+            pw.println("      " + cmpt);
         }
+
         pw.println("    Live " + getCaption() + "s (" + mServices.size() + "):");
         synchronized (mMutex) {
             for (ManagedServiceInfo info : mServices) {
@@ -421,11 +419,9 @@ abstract public class ManagedServices {
             }
         }
 
-        synchronized (mEnabledServicesLock) {
-            for (ComponentName cmpt : mEnabledServicesForCurrentProfiles) {
-                if (filter != null && !filter.matches(cmpt)) continue;
-                cmpt.dumpDebug(proto, ManagedServicesProto.ENABLED);
-            }
+        for (ComponentName cmpt : mEnabledServicesForCurrentProfiles) {
+            if (filter != null && !filter.matches(cmpt)) continue;
+            cmpt.dumpDebug(proto, ManagedServicesProto.ENABLED);
         }
 
         synchronized (mMutex) {
@@ -1282,31 +1278,29 @@ abstract public class ManagedServices {
     protected void populateComponentsToBind(SparseArray<Set<ComponentName>> componentsToBind,
             final IntArray activeUsers,
             SparseArray<ArraySet<ComponentName>> approvedComponentsByUser) {
-        synchronized (mEnabledServicesLock) {
-            mEnabledServicesForCurrentProfiles.clear();
-            mEnabledServicesPackageNames.clear();
-            final int nUserIds = activeUsers.size();
+        mEnabledServicesForCurrentProfiles.clear();
+        mEnabledServicesPackageNames.clear();
+        final int nUserIds = activeUsers.size();
 
-            for (int i = 0; i < nUserIds; ++i) {
-                // decode the list of components
-                final int userId = activeUsers.get(i);
-                final ArraySet<ComponentName> userComponents = approvedComponentsByUser.get(userId);
-                if (null == userComponents) {
-                    componentsToBind.put(userId, new ArraySet<>());
-                    continue;
-                }
+        for (int i = 0; i < nUserIds; ++i) {
+            // decode the list of components
+            final int userId = activeUsers.get(i);
+            final ArraySet<ComponentName> userComponents = approvedComponentsByUser.get(userId);
+            if (null == userComponents) {
+                componentsToBind.put(userId, new ArraySet<>());
+                continue;
+            }
 
-                final Set<ComponentName> add = new HashSet<>(userComponents);
-                add.removeAll(mSnoozingForCurrentProfiles);
+            final Set<ComponentName> add = new HashSet<>(userComponents);
+            add.removeAll(mSnoozingForCurrentProfiles);
 
-                componentsToBind.put(userId, add);
+            componentsToBind.put(userId, add);
 
-                mEnabledServicesForCurrentProfiles.addAll(userComponents);
+            mEnabledServicesForCurrentProfiles.addAll(userComponents);
 
-                for (int j = 0; j < userComponents.size(); j++) {
-                    final ComponentName component = userComponents.valueAt(j);
-                    mEnabledServicesPackageNames.add(component.getPackageName());
-                }
+            for (int j = 0; j < userComponents.size(); j++) {
+                final ComponentName component = userComponents.valueAt(j);
+                mEnabledServicesPackageNames.add(component.getPackageName());
             }
         }
     }
@@ -1781,9 +1775,7 @@ abstract public class ManagedServices {
         public boolean isEnabledForCurrentProfiles() {
             if (this.isSystem) return true;
             if (this.connection == null) return false;
-            synchronized (mEnabledServicesLock) {
-                return mEnabledServicesForCurrentProfiles.contains(this.component);
-            }
+            return mEnabledServicesForCurrentProfiles.contains(this.component);
         }
 
         /**
@@ -1827,9 +1819,7 @@ abstract public class ManagedServices {
 
     /** convenience method for looking in mEnabledServicesForCurrentProfiles */
     public boolean isComponentEnabledForCurrentProfiles(ComponentName component) {
-        synchronized (mEnabledServicesLock) {
-            return mEnabledServicesForCurrentProfiles.contains(component);
-        }
+        return mEnabledServicesForCurrentProfiles.contains(component);
     }
 
     public static class UserProfiles {

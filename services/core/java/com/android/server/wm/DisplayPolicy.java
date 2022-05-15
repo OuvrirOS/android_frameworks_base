@@ -134,7 +134,6 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
-import android.provider.Settings;
 import android.util.ArraySet;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
@@ -177,6 +176,8 @@ import com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.server.wm.InputMonitor.EventReceiverInputConsumer;
+
+import ouvriros.providers.OuvrirSettings;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -457,8 +458,8 @@ public class DisplayPolicy {
             super(handler);
 
             ContentResolver resolver = mContext.getContentResolver();
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.FORCE_SHOW_NAVBAR), false, this,
+            resolver.registerContentObserver(OuvrirSettings.System.getUriFor(
+                    OuvrirSettings.System.FORCE_SHOW_NAVBAR), false, this,
                     UserHandle.USER_ALL);
 
             updateSettings();
@@ -768,8 +769,8 @@ public class DisplayPolicy {
     public void updateSettings() {
         ContentResolver resolver = mContext.getContentResolver();
 
-        mForceNavbar = Settings.System.getIntForUser(resolver,
-                Settings.System.FORCE_SHOW_NAVBAR, 0,
+        mForceNavbar = OuvrirSettings.System.getIntForUser(resolver,
+                OuvrirSettings.System.FORCE_SHOW_NAVBAR, 0,
                 UserHandle.USER_CURRENT);
     }
 
@@ -870,11 +871,6 @@ public class DisplayPolicy {
 
     public ScreenOnListener getScreenOnListener() {
         return mScreenOnListener;
-    }
-
-    public int getTopFullscreenOpaqueWindowStatePrivateFlags() {
-        return mTopFullscreenOpaqueWindowState != null ?
-                mTopFullscreenOpaqueWindowState.getAttrs().privateFlags : 0;
     }
 
     public void screenTurnedOn(ScreenOnListener screenOnListener) {
@@ -1180,9 +1176,6 @@ public class DisplayPolicy {
         switch (attrs.type) {
             case TYPE_NOTIFICATION_SHADE:
                 mNotificationShade = win;
-                if (mDisplayContent.isDefaultDisplay) {
-                    mService.mPolicy.setKeyguardCandidateLw(win);
-                }
                 break;
             case TYPE_STATUS_BAR:
                 mStatusBar = win;
@@ -1378,9 +1371,6 @@ public class DisplayPolicy {
             mDisplayContent.setInsetProvider(ITYPE_NAVIGATION_BAR, null, null);
         } else if (mNotificationShade == win) {
             mNotificationShade = null;
-            if (mDisplayContent.isDefaultDisplay) {
-                mService.mPolicy.setKeyguardCandidateLw(null);
-            }
         } else if (mClimateBarAlt == win) {
             mClimateBarAlt = null;
             mDisplayContent.setInsetProvider(ITYPE_CLIMATE_BAR, null, null);
@@ -1697,15 +1687,6 @@ public class DisplayPolicy {
         contentFrame.set(sTmpRect);
     }
 
-    private void notifyLeftInLandscapeChanged(boolean isOnLeft) {
-        mHandler.post(() -> {
-            StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
-            if (statusBar != null) {
-                statusBar.leftInLandscapeChanged(isOnLeft);
-            }
-        });
-    }
-
     private int layoutNavigationBar(DisplayFrames displayFrames, Rect contentFrame) {
         if (mNavigationBar == null) {
             return NAV_BAR_INVALID;
@@ -1719,16 +1700,9 @@ public class DisplayPolicy {
         final int rotation = displayFrames.mRotation;
         final int displayHeight = displayFrames.mDisplayHeight;
         final int displayWidth = displayFrames.mDisplayWidth;
-        final int lastNavbarPosition = mNavigationBarPosition;
         final int navBarPosition = navigationBarPosition(displayWidth, displayHeight, rotation);
 
         getRotatedWindowBounds(displayFrames, mNavigationBar, navigationFrame);
-
-        if (lastNavbarPosition == NAV_BAR_LEFT && navBarPosition != NAV_BAR_LEFT) {
-            notifyLeftInLandscapeChanged(false);
-        } else if (lastNavbarPosition != NAV_BAR_LEFT && navBarPosition == NAV_BAR_LEFT) {
-            notifyLeftInLandscapeChanged(true);
-        }
 
         final Rect cutoutSafeUnrestricted = sTmpRect;
         cutoutSafeUnrestricted.set(displayFrames.mUnrestricted);
@@ -2255,12 +2229,10 @@ public class DisplayPolicy {
         // Height of the navigation bar frame when presented horizontally at bottom
         mNavigationBarFrameHeightForRotationDefault[portraitRotation] =
         mNavigationBarFrameHeightForRotationDefault[upsideDownRotation] =
-                getShowIMESpace() || !isGesturalMode() ? res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height) :
-                        res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height_hide_ime);
+                res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height);
         mNavigationBarFrameHeightForRotationDefault[landscapeRotation] =
         mNavigationBarFrameHeightForRotationDefault[seascapeRotation] =
-                getShowIMESpace() || !isGesturalMode() ? res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height_landscape) :
-                        res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height_landscape_hide_ime);
+                res.getDimensionPixelSize(R.dimen.navigation_bar_frame_height_landscape);
 
         // Width of the navigation bar when presented vertically along one side
         mNavigationBarWidthForRotationDefault[portraitRotation] =
@@ -3415,15 +3387,5 @@ public class DisplayPolicy {
      */
     boolean shouldAttachNavBarToAppDuringTransition() {
         return mShouldAttachNavBarToAppDuringTransition && mNavigationBar != null;
-    }
-
-    private boolean getShowIMESpace() {
-        return Settings.System.getIntForUser(mContext.getContentResolver(),
-                Settings.System.NAVIGATION_BAR_IME_SPACE, 1, UserHandle.USER_CURRENT) == 1;
-    }
-
-    private boolean isGesturalMode() {
-        return Settings.Secure.getIntForUser(mContext.getContentResolver(),
-                Settings.Secure.NAVIGATION_MODE, 2, UserHandle.USER_CURRENT) == 2;
     }
 }

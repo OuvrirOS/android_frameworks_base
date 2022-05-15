@@ -6441,11 +6441,6 @@ public final class ViewRootImpl implements ViewParent,
         private int processPointerEvent(QueuedInputEvent q) {
             final MotionEvent event = (MotionEvent)q.mEvent;
 
-            if (event.getPointerCount() == 3 && isSwipeToScreenshotGestureActive()) {
-                event.setAction(MotionEvent.ACTION_CANCEL);
-                if (DBG) Log.d(TAG, "canceling motionEvent because of threeGesture detecting");
-            }
-
             mAttachInfo.mUnbufferedDispatchRequested = false;
             mAttachInfo.mHandlingPointerEvent = true;
             boolean handled = mView.dispatchPointerEvent(event);
@@ -6527,7 +6522,7 @@ public final class ViewRootImpl implements ViewParent,
         }
         if (x < 0 || x >= mView.getWidth() || y < 0 || y >= mView.getHeight()) {
             // E.g. when moving window divider with mouse
-            if (DBG) Slog.d(mTag, "updatePointerIcon called with position out of bounds");
+            Slog.d(mTag, "updatePointerIcon called with position out of bounds");
             return false;
         }
         final PointerIcon pointerIcon = mView.onResolvePointerIcon(event, pointerIndex);
@@ -8285,14 +8280,6 @@ public final class ViewRootImpl implements ViewParent,
             mRemoved = true;
             if (mAdded) {
                 dispatchDetachedFromWindow();
-            } else {
-                Log.w(mTag, "add view failed and remove related objects");
-
-                mAccessibilityManager.removeAccessibilityStateChangeListener(
-                        mAccessibilityInteractionConnectionManager);
-                mAccessibilityManager.removeHighTextContrastStateChangeListener(
-                        mHighContrastTextManager);
-                mDisplayManager.unregisterDisplayListener(mDisplayListener);
             }
 
             if (mAdded && !mFirst) {
@@ -8599,13 +8586,13 @@ public final class ViewRootImpl implements ViewParent,
             MotionEvent me = (MotionEvent) event;
             if (me.getAction() == MotionEvent.ACTION_CANCEL) {
                 EventLog.writeEvent(EventLogTags.VIEW_ENQUEUE_INPUT_EVENT, "Motion - Cancel",
-                        getTitle().toString());
+                        getTitle());
             }
         } else if (event instanceof KeyEvent) {
             KeyEvent ke = (KeyEvent) event;
             if (ke.isCanceled()) {
                 EventLog.writeEvent(EventLogTags.VIEW_ENQUEUE_INPUT_EVENT, "Key - Cancel",
-                        getTitle().toString());
+                        getTitle());
             }
         }
         // Always enqueue the input event in order, regardless of its time stamp.
@@ -10642,12 +10629,4 @@ public final class ViewRootImpl implements ViewParent,
        mBLASTDrawConsumer = consume;
        return true;
    }
-
-    private boolean isSwipeToScreenshotGestureActive() {
-        try {
-            return ActivityManager.getService().isSwipeToScreenshotGestureActive();
-        } catch (RemoteException e) {
-            return false;
-        }
-    }
 }

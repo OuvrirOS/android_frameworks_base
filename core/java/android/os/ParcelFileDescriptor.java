@@ -203,11 +203,7 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
             IoUtils.setFdOwner(mCommFd, this);
         }
 
-        try {
-            mGuard.open("close");
-        } catch(Throwable e) {
-            Log.w("ParcelFileDescriptor", "Explicit termination method 'close' not called");
-        }
+        mGuard.open("close");
     }
 
     /**

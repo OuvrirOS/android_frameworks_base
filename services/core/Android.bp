@@ -19,10 +19,7 @@ filegroup {
 
 filegroup {
     name: "services.core-sources",
-    srcs: [
-        "java/**/*.java",
-        "java/**/*.kt",
-    ],
+    srcs: ["java/**/*.java"],
     exclude_srcs: [
         ":services.core-sources-am-wm",
     ],
@@ -126,6 +123,7 @@ java_library_static {
         "app-compat-annotations",
         "framework-tethering.stubs.module_lib",
         "service-permission.stubs.system_server",
+        "org.ouvriros.platform.internal",
     ],
 
     required: [
@@ -165,10 +163,6 @@ java_library_static {
         "overlayable_policy_aidl-java",
         "SurfaceFlingerProperties",
         "com.android.sysprop.watchdog",
-        "kotlin-stdlib",
-        "kotlinx-coroutines-android",
-        "kotlinx-coroutines-core",
-        "faceunlock_framework",
     ],
     javac_shard_size: 50,
 }

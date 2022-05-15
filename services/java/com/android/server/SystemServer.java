@@ -120,7 +120,6 @@ import com.android.server.contentcapture.ContentCaptureManagerInternal;
 import com.android.server.coverage.CoverageService;
 import com.android.server.devicepolicy.DevicePolicyManagerService;
 import com.android.server.devicestate.DeviceStateManagerService;
-import com.android.server.display.AutoAODService;
 import com.android.server.display.DisplayManagerService;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.dreams.DreamManagerService;
@@ -213,6 +212,9 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -222,9 +224,6 @@ import java.util.Timer;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
-
-// OuvrirHardware
-import com.android.server.custom.OuvrirHardwareService;
 
 /**
  * Entry point to {@code system_server}.
@@ -390,9 +389,6 @@ public final class SystemServer implements Dumpable {
     private static final String UWB_SERVICE_CLASS = "com.android.server.uwb.UwbService";
 
     private static final String TETHERING_CONNECTOR_CLASS = "android.net.ITetheringConnector";
-
-    private static final String APP_LOCK_SERVICE_CLASS =
-            "com.android.server.app.AppLockManagerService$Lifecycle";
 
     private static final String PERSISTENT_DATA_BLOCK_PROP = "ro.frp.pst";
 
@@ -818,7 +814,7 @@ public final class SystemServer implements Dumpable {
             initZygoteChildHeapProfiling();
 
             // Debug builds - spawn a thread to monitor for fd leaks.
-            if (Build.IS_ENG) {
+            if (Build.IS_DEBUGGABLE) {
                 spawnFdLeakCheckThread();
             }
 
@@ -1575,12 +1571,6 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("AppIntegrityService");
             mSystemServiceManager.startService(AppIntegrityManagerService.class);
             t.traceEnd();
-
-            if (context.getResources().getBoolean(R.bool.config_dozeAlwaysOnDisplayAvailable)) {
-                t.traceBegin("AutoAODService");
-                mSystemServiceManager.startService(AutoAODService.class);
-                t.traceEnd();
-            }
 
         } catch (Throwable e) {
             Slog.e("System", "******************************************");
@@ -2434,13 +2424,6 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartMediaMetricsManager");
             mSystemServiceManager.startService(MediaMetricsManagerService.class);
             t.traceEnd();
-
-            // OuvrirHardware
-            if (!mOnlyCore){
-                t.traceBegin("StartOuvrirHardwareService");
-                mSystemServiceManager.startService(OuvrirHardwareService.class);
-                t.traceEnd();
-            }
         }
 
         if (!isWatch) {
@@ -2550,6 +2533,26 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(TracingServiceProxy.class);
         t.traceEnd();
 
+        // Ouvrir Services
+        String externalServer = context.getResources().getString(
+                org.ouvriros.platform.internal.R.string.config_externalSystemServer);
+        final Class<?> serverClazz;
+        try {
+            serverClazz = Class.forName(externalServer);
+            final Constructor<?> constructor = serverClazz.getDeclaredConstructor(Context.class);
+            constructor.setAccessible(true);
+            final Object baseObject = constructor.newInstance(mSystemContext);
+            final Method method = baseObject.getClass().getDeclaredMethod("run");
+            method.setAccessible(true);
+            method.invoke(baseObject);
+        } catch (ClassNotFoundException
+                | IllegalAccessException
+                | InvocationTargetException
+                | InstantiationException
+                | NoSuchMethodException e) {
+            reportWtf("Making " + externalServer + " ready", e);
+        }
+
         // It is now time to start up the app processes...
 
         t.traceBegin("MakeLockSettingsServiceReady");
@@ -2658,10 +2661,6 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(UWB_SERVICE_CLASS);
             t.traceEnd();
         }
-
-        t.traceBegin("AppLockManagerService");
-        mSystemServiceManager.startService(APP_LOCK_SERVICE_CLASS);
-        t.traceEnd();
 
         t.traceBegin("StartBootPhaseDeviceSpecificServicesReady");
         mSystemServiceManager.startBootPhase(t, SystemService.PHASE_DEVICE_SPECIFIC_SERVICES_READY);

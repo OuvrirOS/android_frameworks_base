@@ -37,8 +37,8 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Insets;
 import android.graphics.Rect;
-import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Size;
@@ -54,6 +54,8 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.R;
 import com.android.internal.policy.SystemBarUtils;
+
+import ouvriros.providers.OuvrirSettings;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -485,8 +487,8 @@ public class DisplayLayout {
 
     static boolean hasNavigationBar(DisplayInfo info, Context context, int displayId) {
         if (displayId == Display.DEFAULT_DISPLAY) {
-            if (Settings.System.getIntForUser(context.getContentResolver(),
-                    Settings.System.FORCE_SHOW_NAVBAR, 0,
+            if (OuvrirSettings.System.getIntForUser(context.getContentResolver(),
+                    OuvrirSettings.System.FORCE_SHOW_NAVBAR, 0,
                     UserHandle.USER_CURRENT) == 1) {
                 return true;
             }

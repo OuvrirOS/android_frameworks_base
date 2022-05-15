@@ -53,7 +53,6 @@ import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.statusbar.policy.BluetoothController;
-import com.android.systemui.statusbar.policy.KeyguardStateController;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -62,8 +61,8 @@ import java.util.List;
 import javax.inject.Inject;
 
 /** Quick settings tile: Bluetooth **/
-public class BluetoothTile extends SecureQSTile<BooleanState> {
-    private static final Intent BLUETOOTH_SETTINGS = new Intent(Settings.Panel.ACTION_BLUETOOTH);
+public class BluetoothTile extends QSTileImpl<BooleanState> {
+    private static final Intent BLUETOOTH_SETTINGS = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
 
     private final BluetoothController mController;
     private final BluetoothDetailAdapter mDetailAdapter;
@@ -78,11 +77,10 @@ public class BluetoothTile extends SecureQSTile<BooleanState> {
             StatusBarStateController statusBarStateController,
             ActivityStarter activityStarter,
             QSLogger qsLogger,
-            BluetoothController bluetoothController,
-            KeyguardStateController keyguardStateController
+            BluetoothController bluetoothController
     ) {
         super(host, backgroundLooper, mainHandler, falsingManager, metricsLogger,
-                statusBarStateController, activityStarter, qsLogger, keyguardStateController);
+                statusBarStateController, activityStarter, qsLogger);
         mController = bluetoothController;
         mDetailAdapter = (BluetoothDetailAdapter) createDetailAdapter();
         mController.observe(getLifecycle(), mCallback);
@@ -99,11 +97,7 @@ public class BluetoothTile extends SecureQSTile<BooleanState> {
     }
 
     @Override
-    protected void handleClick(@Nullable View view, boolean keyguardShowing) {
-        if (checkKeyguard(view, keyguardShowing)) {
-            return;
-        }
-
+    protected void handleClick(@Nullable View view) {
         // Secondary clicks are header clicks, just toggle.
         final boolean isEnabled = mState.value;
         // Immediately enter transient enabling state when turning bluetooth on.
@@ -113,7 +107,7 @@ public class BluetoothTile extends SecureQSTile<BooleanState> {
 
     @Override
     public Intent getLongClickIntent() {
-        return BLUETOOTH_SETTINGS;
+        return new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
     }
 
     @Override
@@ -306,7 +300,7 @@ public class BluetoothTile extends SecureQSTile<BooleanState> {
             // This method returns Pair<Drawable, String> while first value is the drawable
             return BluetoothDeviceLayerDrawable.createLayerDrawable(
                     context,
-                    R.drawable.ic_qs_bluetooth_connected,
+                    R.drawable.ic_bluetooth_connected,
                     mBatteryLevel,
                     mIconScale);
         }
@@ -327,7 +321,7 @@ public class BluetoothTile extends SecureQSTile<BooleanState> {
         @Override
         public Drawable getDrawable(Context context) {
             // This method returns Pair<Drawable, String> - the first value is the drawable.
-            return context.getDrawable(R.drawable.ic_qs_bluetooth_connected);
+            return context.getDrawable(R.drawable.ic_bluetooth_connected);
         }
     }
 
@@ -406,7 +400,7 @@ public class BluetoothTile extends SecureQSTile<BooleanState> {
                     item.tag = device;
                     int state = device.getMaxConnectionState();
                     if (state == BluetoothProfile.STATE_CONNECTED) {
-                        item.iconResId = R.drawable.ic_qs_bluetooth_connected;
+                        item.iconResId = R.drawable.ic_bluetooth_connected;
                         int batteryLevel = device.getBatteryLevel();
                         if (batteryLevel > BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
                             item.icon = new BluetoothBatteryTileIcon(batteryLevel,1 /* iconScale */);

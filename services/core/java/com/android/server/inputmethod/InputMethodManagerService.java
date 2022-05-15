@@ -192,6 +192,9 @@ import com.android.server.statusbar.StatusBarManagerService;
 import com.android.server.utils.PriorityDump;
 import com.android.server.wm.WindowManagerInternal;
 
+import ouvriros.hardware.OuvrirHardwareManager;
+import ouvriros.providers.OuvrirSettings;
+
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -364,6 +367,8 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
     private PendingIntent mImeSwitchPendingIntent;
     private boolean mShowOngoingImeSwitcherForPhones;
     private boolean mNotificationShown;
+
+    private OuvrirHardwareManager mOuvrirHardware;
 
     static class SessionState {
         final ClientState client;
@@ -1066,6 +1071,22 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                     Settings.Secure.SHOW_IME_WITH_HARD_KEYBOARD), false, this, userId);
             resolver.registerContentObserver(Settings.Secure.getUriFor(
                     Settings.Secure.ACCESSIBILITY_SOFT_KEYBOARD_MODE), false, this, userId);
+            if (mOuvrirHardware.isSupported(
+                    OuvrirHardwareManager.FEATURE_HIGH_TOUCH_POLLING_RATE)) {
+                resolver.registerContentObserver(OuvrirSettings.System.getUriFor(
+                        OuvrirSettings.System.HIGH_TOUCH_POLLING_RATE_ENABLE),
+                        false, this, userId);
+            }
+            if (mOuvrirHardware.isSupported(
+                    OuvrirHardwareManager.FEATURE_HIGH_TOUCH_SENSITIVITY)) {
+                resolver.registerContentObserver(OuvrirSettings.System.getUriFor(
+                        OuvrirSettings.System.HIGH_TOUCH_SENSITIVITY_ENABLE),
+                        false, this, userId);
+            }
+            if (mOuvrirHardware.isSupported(OuvrirHardwareManager.FEATURE_TOUCH_HOVERING)) {
+                resolver.registerContentObserver(OuvrirSettings.Secure.getUriFor(
+                        OuvrirSettings.Secure.FEATURE_TOUCH_HOVERING), false, this, userId);
+            }
             mRegistered = true;
         }
 
@@ -1074,6 +1095,12 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                     Settings.Secure.SHOW_IME_WITH_HARD_KEYBOARD);
             final Uri accessibilityRequestingNoImeUri = Settings.Secure.getUriFor(
                     Settings.Secure.ACCESSIBILITY_SOFT_KEYBOARD_MODE);
+            final Uri highTouchPollingRateUri = OuvrirSettings.System.getUriFor(
+                    OuvrirSettings.System.HIGH_TOUCH_POLLING_RATE_ENABLE);
+            final Uri touchSensitivityUri = OuvrirSettings.System.getUriFor(
+                    OuvrirSettings.System.HIGH_TOUCH_SENSITIVITY_ENABLE);
+            final Uri touchHoveringUri = OuvrirSettings.Secure.getUriFor(
+                    OuvrirSettings.Secure.FEATURE_TOUCH_HOVERING);
             synchronized (mMethodMap) {
                 if (showImeUri.equals(uri)) {
                     mMenuController.updateKeyboardFromSettingsLocked();
@@ -1094,6 +1121,12 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                                 InputMethodManager.SHOW_IMPLICIT, null,
                                 SoftInputShowHideReason.SHOW_SETTINGS_ON_CHANGE);
                     }
+                } else if (highTouchPollingRateUri.equals(uri)) {
+                    updateTouchPollingRate();
+                } else if (touchSensitivityUri.equals(uri)) {
+                    updateTouchSensitivity();
+                } else if (touchHoveringUri.equals(uri)) {
+                    updateTouchHovering();
                 } else {
                     boolean enabledChanged = false;
                     String newEnabled = mSettings.getEnabledInputMethodsStr();
@@ -1721,6 +1754,10 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                     mContext.getBasePackageName());
         }
 
+        updateTouchHovering();
+        updateTouchPollingRate();
+        updateTouchSensitivity();
+
         if (DEBUG) Slog.d(TAG, "Switching user stage 3/3. newUserId=" + newUserId
                 + " selectedIme=" + mSettings.getSelectedInputMethod());
 
@@ -1770,6 +1807,14 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
                 final int currentUserId = mSettings.getCurrentUserId();
                 mSettings.switchCurrentUser(currentUserId,
                         !mUserManagerInternal.isUserUnlockingOrUnlocked(currentUserId));
+
+                // Must happen before registerContentObserverLocked
+                mOuvrirHardware = OuvrirHardwareManager.getInstance(mContext);
+
+                updateTouchHovering();
+                updateTouchPollingRate();
+                updateTouchSensitivity();
+
                 mKeyguardManager = mContext.getSystemService(KeyguardManager.class);
                 mNotificationManager = mContext.getSystemService(NotificationManager.class);
                 mStatusBar = statusBar;
@@ -2977,6 +3022,33 @@ public class InputMethodManagerService extends IInputMethodManager.Stub
         // the same enabled IMEs list.
         mSwitchingController.resetCircularListLocked(mContext);
 
+    }
+
+    private void updateTouchPollingRate() {
+        if (!mOuvrirHardware.isSupported(OuvrirHardwareManager.FEATURE_HIGH_TOUCH_POLLING_RATE)) {
+            return;
+        }
+        final boolean enabled = OuvrirSettings.System.getInt(mContext.getContentResolver(),
+                OuvrirSettings.System.HIGH_TOUCH_POLLING_RATE_ENABLE, 0) == 1;
+        mOuvrirHardware.set(OuvrirHardwareManager.FEATURE_HIGH_TOUCH_POLLING_RATE, enabled);
+    }
+
+    private void updateTouchSensitivity() {
+        if (!mOuvrirHardware.isSupported(OuvrirHardwareManager.FEATURE_HIGH_TOUCH_SENSITIVITY)) {
+            return;
+        }
+        final boolean enabled = OuvrirSettings.System.getInt(mContext.getContentResolver(),
+                OuvrirSettings.System.HIGH_TOUCH_SENSITIVITY_ENABLE, 0) == 1;
+        mOuvrirHardware.set(OuvrirHardwareManager.FEATURE_HIGH_TOUCH_SENSITIVITY, enabled);
+    }
+
+    private void updateTouchHovering() {
+        if (!mOuvrirHardware.isSupported(OuvrirHardwareManager.FEATURE_TOUCH_HOVERING)) {
+            return;
+        }
+        final boolean enabled = OuvrirSettings.Secure.getInt(mContext.getContentResolver(),
+                OuvrirSettings.Secure.FEATURE_TOUCH_HOVERING, 0) == 1;
+        mOuvrirHardware.set(OuvrirHardwareManager.FEATURE_TOUCH_HOVERING, enabled);
     }
 
     /* package */ void setInputMethodLocked(String id, int subtypeId) {

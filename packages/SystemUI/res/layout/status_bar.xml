@@ -71,23 +71,16 @@
                     android:layout_height="match_parent"
                     android:layout="@layout/operator_name" />
 
-                <com.android.keyguard.AlphaOptimizedLinearLayout
-                    android:id="@+id/left_icon_area"
+                <com.android.systemui.statusbar.policy.Clock
+                    android:id="@+id/clock"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:orientation="horizontal" >
-
-                    <com.android.systemui.statusbar.policy.Clock
-                        android:id="@+id/clock"
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:textAppearance="@style/TextAppearance.StatusBar.Clock"
-                        android:singleLine="true"
-                        android:paddingStart="@dimen/status_bar_left_clock_starting_padding"
-                        android:paddingEnd="@dimen/status_bar_left_clock_end_padding"
-                        android:gravity="center_vertical|start"
-                    />
-                </com.android.keyguard.AlphaOptimizedLinearLayout>
+                    android:textAppearance="@style/TextAppearance.StatusBar.Clock"
+                    android:singleLine="true"
+                    android:paddingStart="@dimen/status_bar_left_clock_starting_padding"
+                    android:paddingEnd="@dimen/status_bar_left_clock_end_padding"
+                    android:gravity="center_vertical|start"
+                />
 
                 <include layout="@layout/ongoing_call_chip" />
 
@@ -136,7 +129,6 @@
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingTop="@dimen/status_bar_padding_top"
         >
         <com.android.systemui.statusbar.policy.Clock
             android:id="@+id/clock_center"
@@ -147,6 +139,23 @@
             android:gravity="center"
             android:visibility="gone"
         />
+
+        <com.android.systemui.statusbar.OuvrirStatusBarItemHolder
+            android:id="@+id/network_traffic_holder"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layoutDirection="ltr"
+            android:gravity="center"
+            >
+
+            <org.ouvriros.internal.statusbar.NetworkTraffic
+                android:id="@+id/network_traffic"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:maxLines="2"
+                android:gravity="center" />
+
+        </com.android.systemui.statusbar.OuvrirStatusBarItemHolder>
     </com.android.keyguard.AlphaOptimizedLinearLayout>
 
     <ViewStub

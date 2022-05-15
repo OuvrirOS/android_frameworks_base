@@ -412,6 +412,8 @@ import com.android.server.utils.WatchedSparseIntArray;
 import com.android.server.utils.Watcher;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
+import com.nvidia.NvAppProfileService;
+
 import dalvik.system.CloseGuard;
 import dalvik.system.VMRuntime;
 
@@ -1455,6 +1457,8 @@ public class PackageManagerService extends IPackageManager.Stub
 
     final PackageInstallerService mInstallerService;
 
+    private NvAppProfileService mAppProfileService;
+
     final ArtManagerService mArtManagerService;
 
     final PackageDexOptimizer mPackageDexOptimizer;
@@ -1537,6 +1541,8 @@ public class PackageManagerService extends IPackageManager.Stub
     private final LegacyPermissionManagerInternal mLegacyPermissionManager;
 
     private final PackageProperty mPackageProperty = new PackageProperty();
+
+    ArrayList<ComponentName> mDisabledComponentsList;
 
     // Set of pending broadcasts for aggregating enable/disable of components.
     @VisibleForTesting(visibility = Visibility.PACKAGE)
@@ -3324,29 +3330,6 @@ public class PackageManagerService extends IPackageManager.Stub
             return result;
         }
 
-        private boolean requestsFakeSignature(AndroidPackage p) {
-            return p.getMetaData() != null &&
-                    p.getMetaData().getString("fake-signature") != null;
-        }
-
-        private PackageInfo mayFakeSignature(AndroidPackage p, PackageInfo pi,
-                Set<String> permissions) {
-            try {
-                if (p.getMetaData() != null &&
-                        p.getTargetSdkVersion() > Build.VERSION_CODES.LOLLIPOP_MR1) {
-                    String sig = p.getMetaData().getString("fake-signature");
-                    if (sig != null &&
-                            permissions.contains("android.permission.FAKE_PACKAGE_SIGNATURE")) {
-                        pi.signatures = new Signature[] {new Signature(sig)};
-                    }
-                }
-            } catch (Throwable t) {
-                // We should never die because of any failures, this is system code!
-                Log.w("PackageManagerService.FAKE_PACKAGE_SIGNATURE", t);
-            }
-            return pi;
-        }
-
         public final PackageInfo generatePackageInfo(PackageSetting ps, int flags, int userId) {
             if (!mUserManager.exists(userId)) return null;
             if (ps == null) {
@@ -3375,14 +3358,12 @@ public class PackageManagerService extends IPackageManager.Stub
                 final int[] gids = (flags & PackageManager.GET_GIDS) == 0 ? EMPTY_INT_ARRAY
                         : mPermissionManager.getGidsForUid(UserHandle.getUid(userId, ps.appId));
                 // Compute granted permissions only if package has requested permissions
-                final Set<String> permissions = (((flags & PackageManager.GET_PERMISSIONS) == 0
-                        && !requestsFakeSignature(p))
+                final Set<String> permissions = ((flags & PackageManager.GET_PERMISSIONS) == 0
                         || ArrayUtils.isEmpty(p.getRequestedPermissions())) ? Collections.emptySet()
                         : mPermissionManager.getGrantedPermissions(ps.name, userId);
 
-                PackageInfo packageInfo = mayFakeSignature(p, PackageInfoUtils.generate(p, gids, flags,
-                        ps.firstInstallTime, ps.lastUpdateTime, permissions, state, userId, ps),
-                        permissions);
+                PackageInfo packageInfo = PackageInfoUtils.generate(p, gids, flags,
+                        ps.firstInstallTime, ps.lastUpdateTime, permissions, state, userId, ps);
 
                 if (packageInfo == null) {
                     return null;
@@ -7284,14 +7265,6 @@ public class PackageManagerService extends IPackageManager.Stub
         Watchable.verifyWatchedAttributes(this, mWatcher, !(mIsEngBuild || mIsUserDebugBuild));
     }
 
-    private static Signature[] createSignatures(String[] hexBytes) {
-        Signature[] sigs = new Signature[hexBytes.length];
-        for (int i = 0; i < sigs.length; i++) {
-            sigs[i] = new Signature(hexBytes[i]);
-        }
-        return sigs;
-    }
-
     /**
      * A extremely minimal constructor designed to start up a PackageManagerService instance for
      * testing.
@@ -7387,6 +7360,14 @@ public class PackageManagerService extends IPackageManager.Stub
         invalidatePackageInfoCache();
     }
 
+    private static Signature[] createSignatures(String[] hexBytes) {
+        Signature[] sigs = new Signature[hexBytes.length];
+        for (int i = 0; i < sigs.length; i++) {
+            sigs[i] = new Signature(hexBytes[i]);
+        }
+        return sigs;
+    }
+
     public PackageManagerService(Injector injector, boolean onlyCore, boolean factoryTest,
             final String buildFingerprint, final boolean isEngBuild,
             final boolean isUserDebugBuild, final int sdkVersion, final String incrementalVersion) {
@@ -7417,7 +7398,7 @@ public class PackageManagerService extends IPackageManager.Stub
         mEnableFreeCacheV2 = SystemProperties.getBoolean("fw.free_cache_v2", true);
 
         mVendorPlatformSignatures = createSignatures(mContext.getResources().getStringArray(
-                com.android.internal.R.array.config_vendorPlatformSignatures));
+                org.ouvriros.platform.internal.R.array.config_vendorPlatformSignatures));
 
         // Create sub-components that provide services / data. Order here is important.
         t.traceBegin("createSubComponents");
@@ -7444,6 +7425,13 @@ public class PackageManagerService extends IPackageManager.Stub
             @Override
             public boolean hasFeature(String feature) {
                 return PackageManagerService.this.hasSystemFeature(feature, 0);
+            }
+
+            public NvAppProfileService getAppProfileService() {
+                if (mAppProfileService == null) {
+                    mAppProfileService = new NvAppProfileService(mContext);
+                }
+                return mAppProfileService;
             }
         };
 
@@ -7653,7 +7641,7 @@ public class PackageManagerService extends IPackageManager.Stub
                 }
             }
 
-            mCacheDir = preparePackageParserCache(mIsEngBuild, mIsUpgrade);
+            mCacheDir = preparePackageParserCache(mIsEngBuild);
 
             // Set flag to monitor and not change apk file paths when
             // scanning install directories.
@@ -8082,6 +8070,20 @@ public class PackageManagerService extends IPackageManager.Stub
                 Slog.i(TAG, "Deferred reconcileAppsData finished " + count + " packages");
             }, "prepareAppData");
 
+            // Disable components marked for disabling at build-time
+            mDisabledComponentsList = new ArrayList<ComponentName>();
+            enableComponents(mContext.getResources().getStringArray(
+                     org.ouvriros.platform.internal.R.array.config_deviceDisabledComponents),
+                     false);
+            enableComponents(mContext.getResources().getStringArray(
+                    org.ouvriros.platform.internal.R.array.config_globallyDisabledComponents),
+                    false);
+
+            // Enable components marked for forced-enable at build-time
+            enableComponents(mContext.getResources().getStringArray(
+                    org.ouvriros.platform.internal.R.array.config_forceEnabledComponents),
+                    true);
+
             // If this is first boot after an OTA, and a normal boot, then
             // we need to clear code cache directories.
             // Note that we do *not* clear the application profiles. These remain valid
@@ -8243,6 +8245,29 @@ public class PackageManagerService extends IPackageManager.Stub
         mServiceStartWithDelay = SystemClock.uptimeMillis() + (60 * 1000L);
 
         Slog.i(TAG, "Fix for b/169414761 is applied");
+    }
+
+    private void enableComponents(String[] components, boolean enable) {
+        // Disable or enable components marked at build-time
+        for (String name : components) {
+            ComponentName cn = ComponentName.unflattenFromString(name);
+            if (!enable) {
+                mDisabledComponentsList.add(cn);
+            }
+            Slog.v(TAG, "Changing enabled state of " + name + " to " + enable);
+            String className = cn.getClassName();
+            PackageSetting pkgSetting = mSettings.mPackages.get(cn.getPackageName());
+            if (pkgSetting == null || pkgSetting.pkg == null
+                    || !AndroidPackageUtils.hasComponentClassName(pkgSetting.pkg, className)) {
+                Slog.w(TAG, "Unable to change enabled state of " + name + " to " + enable);
+                continue;
+            }
+            if (enable) {
+                pkgSetting.enableComponentLPw(className, UserHandle.USER_OWNER);
+            } else {
+                pkgSetting.disableComponentLPw(className, UserHandle.USER_OWNER);
+            }
+        }
     }
 
     /**
@@ -8486,7 +8511,7 @@ public class PackageManagerService extends IPackageManager.Stub
         setUpInstantAppInstallerActivityLP(getInstantAppInstallerLPr());
     }
 
-    private @Nullable File preparePackageParserCache(boolean forEngBuild, boolean isUpgrade) {
+    private @Nullable File preparePackageParserCache(boolean forEngBuild) {
         if (!FORCE_PACKAGE_PARSED_CACHE_ENABLED) {
             if (!DEFAULT_PACKAGE_PARSER_CACHE_ENABLED) {
                 return null;
@@ -8517,7 +8542,7 @@ public class PackageManagerService extends IPackageManager.Stub
 
         // Reconcile cache directories, keeping only what we'd actually use.
         for (File cacheDir : FileUtils.listFilesOrEmpty(cacheBaseDir)) {
-            if (!isUpgrade && Objects.equals(cacheName, cacheDir.getName())) {
+            if (Objects.equals(cacheName, cacheDir.getName())) {
                 Slog.d(TAG, "Keeping known cache " + cacheDir.getName());
             } else {
                 Slog.d(TAG, "Destroying unknown cache " + cacheDir.getName());
@@ -24033,6 +24058,12 @@ public class PackageManagerService extends IPackageManager.Stub
     public void setComponentEnabledSetting(ComponentName componentName,
             int newState, int flags, int userId) {
         if (!mUserManager.exists(userId)) return;
+        // Don't allow to enable components marked for disabling at build-time
+        if (mDisabledComponentsList.contains(componentName)) {
+            Slog.d(TAG, "Ignoring attempt to set enabled state of disabled component "
+                    + componentName.flattenToString());
+            return;
+        }
         setEnabledSetting(componentName.getPackageName(),
                 componentName.getClassName(), newState, flags, userId, null);
     }

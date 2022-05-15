@@ -523,15 +523,7 @@ public class AuthController extends SystemUI implements CommandQueue.Callbacks,
     }
 
     private void updateFingerprintLocation() {
-        boolean isPowerbuttonFps =
-                mFingerprintManager != null && mFingerprintManager.isPowerbuttonFps();
-
-        int xLocation;
-        if (isPowerbuttonFps) {
-            xLocation = DisplayUtils.getWidth(mContext);
-        } else {
-            xLocation = DisplayUtils.getWidth(mContext) / 2;
-        }
+        int xLocation = DisplayUtils.getWidth(mContext) / 2;
         try {
             xLocation = mContext.getResources().getDimensionPixelSize(
                     com.android.systemui.R.dimen

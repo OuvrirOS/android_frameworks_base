@@ -28,7 +28,6 @@ import android.graphics.Rect;
 import android.os.Handler;
 import android.os.UserHandle;
 import android.os.RemoteException;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.Display;
 import android.view.InsetsController;
@@ -38,10 +37,10 @@ import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.view.animation.Interpolator;
 
-import com.android.internal.util.dot.DotUtils;
-
 import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecsFuture;
 import com.android.systemui.shared.recents.view.RecentsTransition;
+
+import ouvriros.providers.OuvrirSettings;
 
 public class WindowManagerWrapper {
 
@@ -198,10 +197,11 @@ public class WindowManagerWrapper {
      * @return whether there is a soft nav bar on specific display.
      */
     public boolean hasSoftNavigationBar(Context context, int displayId) {
-        if (displayId == Display.DEFAULT_DISPLAY) {
-            return Settings.System.getIntForUser(context.getContentResolver(),
-                            Settings.System.FORCE_SHOW_NAVBAR, DotUtils.hasNavbarByDefault(context) ? 1 : 0,
-                            UserHandle.USER_CURRENT) == 1;
+        if (displayId == Display.DEFAULT_DISPLAY &&
+                OuvrirSettings.System.getIntForUser(context.getContentResolver(),
+                        OuvrirSettings.System.FORCE_SHOW_NAVBAR, 0,
+                        UserHandle.USER_CURRENT) == 1) {
+            return true;
         }
         try {
             return WindowManagerGlobal.getWindowManagerService().hasNavigationBar(displayId);

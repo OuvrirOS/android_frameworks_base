@@ -105,7 +105,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class BluetoothManagerService extends IBluetoothManager.Stub {
     private static final String TAG = "BluetoothManagerService";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
 
     private static final String BLUETOOTH_PRIVILEGED =
             android.Manifest.permission.BLUETOOTH_PRIVILEGED;
@@ -1867,11 +1867,12 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                     mHandler.removeMessages(MESSAGE_RESTART_BLUETOOTH_SERVICE);
                     mEnable = true;
 
+                    mQuietEnable = (msg.arg1 == 1);
+
                     if (isBle == 0) {
                         persistBluetoothSetting(BLUETOOTH_ON_BLUETOOTH);
                     }
 
-                    mQuietEnable = (msg.arg1 == 1);
                     // Use service interface to get the exact state
                     try {
                         mBluetoothLock.readLock().lock();

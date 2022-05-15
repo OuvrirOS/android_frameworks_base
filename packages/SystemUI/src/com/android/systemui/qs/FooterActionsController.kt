@@ -37,7 +37,6 @@ import com.android.systemui.qs.FooterActionsController.ExpansionState.EXPANDED
 import com.android.systemui.qs.dagger.QSFlagsModule.PM_LITE_ENABLED
 import com.android.systemui.statusbar.phone.MultiUserSwitchController
 import com.android.systemui.statusbar.phone.SettingsButton
-import com.android.systemui.statusbar.phone.RunningServicesButton
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
 import com.android.systemui.statusbar.policy.UserInfoController
 import com.android.systemui.statusbar.policy.UserInfoController.OnUserInfoChangedListener
@@ -71,7 +70,6 @@ class FooterActionsController @Inject constructor(
     enum class ExpansionState { COLLAPSED, EXPANDED }
 
     private var listening: Boolean = false
-    private var mShowPMLiteButton: Boolean = true
 
     var expanded = false
 
@@ -79,23 +77,11 @@ class FooterActionsController @Inject constructor(
     private val settingsButtonContainer: View? = view.findViewById(R.id.settings_button_container)
     private val editButton: View = view.findViewById(android.R.id.edit)
     private val powerMenuLite: View = view.findViewById(R.id.pm_lite)
-    private val runningServicesButton: RunningServicesButton = view.findViewById(R.id.running_services_button)
 
     private val onUserInfoChangedListener = OnUserInfoChangedListener { _, picture, _ ->
         val isGuestUser: Boolean = userManager.isGuestUser(KeyguardUpdateMonitor.getCurrentUser())
         mView.onUserInfoChanged(picture, isGuestUser)
     }
-
-    private val QS_FOOTER_SHOW_SETTINGS =
-            "system:" + Settings.System.QS_FOOTER_SHOW_SETTINGS
-    private val QS_FOOTER_SHOW_SERVICES =
-            "system:" + Settings.System.QS_FOOTER_SHOW_SERVICES
-    private val QS_FOOTER_SHOW_EDIT =
-            "system:" + Settings.System.QS_FOOTER_SHOW_EDIT
-    private val  QS_FOOTER_SHOW_USER =
-            "system:" + Settings.System.QS_FOOTER_SHOW_USER
-    private val  QS_FOOTER_SHOW_POWER_MENU =
-            "system:" + Settings.System.QS_FOOTER_SHOW_POWER_MENU
 
     private val onClickListener = View.OnClickListener { v ->
         // Don't do anything until views are unhidden. Don't do anything if the tap looks
@@ -131,16 +117,6 @@ class FooterActionsController @Inject constructor(
         } else if (v === powerMenuLite) {
             uiEventLogger.log(GlobalActionsDialogLite.GlobalActionsEvent.GA_OPEN_QS)
             globalActionsDialog.showOrHideDialog(false, true, v)
-        } else if (v === runningServicesButton) {
-            if (!deviceProvisionedController.isCurrentUserSetup) {
-                // If user isn't setup just unlock the device and dump them back at SUW.
-                activityStarter.postQSRunnableDismissingKeyguard {}
-                return@OnClickListener
-            }
-            metricsLogger.action(
-                    if (expanded) MetricsProto.MetricsEvent.ACTION_QS_EXPANDED_SETTINGS_LAUNCH
-                    else MetricsProto.MetricsEvent.ACTION_QS_COLLAPSED_SETTINGS_LAUNCH)
-            startRunningServicesActivity()
         }
     }
 
@@ -174,17 +150,15 @@ class FooterActionsController @Inject constructor(
                 true /* dismissShade */, animationController)
     }
 
-    private fun startRunningServicesActivity() {
-        val intent = Intent()
-        intent.setClassName("com.android.settings",
-                "com.android.settings.Settings\$DevRunningServicesActivity")
-        activityStarter.startActivity(intent, true /* dismissShade */)
-    }
-
     @VisibleForTesting
     public override fun onViewAttached() {
+        if (showPMLiteButton) {
+            powerMenuLite.visibility = View.VISIBLE
+            powerMenuLite.setOnClickListener(onClickListener)
+        } else {
+            powerMenuLite.visibility = View.GONE
+        }
         settingsButton.setOnClickListener(onClickListener)
-        runningServicesButton.setOnClickListener(onClickListener)
         editButton.setOnClickListener(View.OnClickListener { view: View? ->
             if (falsingManager.isFalseTap(FalsingManager.LOW_PENALTY)) {
                 return@OnClickListener
@@ -192,53 +166,11 @@ class FooterActionsController @Inject constructor(
             activityStarter.postQSRunnableDismissingKeyguard { qsPanelController.showEdit(view) }
         })
 
-        tunerService.addTunable(object : TunerService.Tunable {
-            override fun onTuningChanged(key: String?, newValue: String?) {
-                mView.updateSettingsIconVisibility(tunerService.getValue(key, 1) != 0)
-            }
-        }, QS_FOOTER_SHOW_SETTINGS)
-
-        tunerService.addTunable(object : TunerService.Tunable {
-            override fun onTuningChanged(key: String?, newValue: String?) {
-                mView.updateServicesIconVisibility(tunerService.getValue(key, 0) != 0)
-            }
-        }, QS_FOOTER_SHOW_SERVICES)
-
-        tunerService.addTunable(object : TunerService.Tunable {
-            override fun onTuningChanged(key: String?, newValue: String?) {
-                mView.updateEditIconVisibility(tunerService.getValue(key, 1) != 0)
-            }
-        }, QS_FOOTER_SHOW_EDIT)
-
-        tunerService.addTunable(object : TunerService.Tunable {
-            override fun onTuningChanged(key: String?, newValue: String?) {
-                mView.updateUserIconVisibility(tunerService.getValue(key, 1) != 0)
-            }
-        }, QS_FOOTER_SHOW_USER)
-
-        tunerService.addTunable(object : TunerService.Tunable {
-            override fun onTuningChanged(key: String?, newValue: String?) {
-                mShowPMLiteButton = tunerService.getValue(key, 1) != 0
-                updatePMLiteIconVisibility()
-            }
-        }, QS_FOOTER_SHOW_POWER_MENU)
-
         updateView()
-    }
-
-    private fun updatePMLiteIconVisibility() {
-        if (mShowPMLiteButton) {
-            powerMenuLite.visibility = View.VISIBLE
-            powerMenuLite.setOnClickListener(onClickListener)
-        } else {
-            powerMenuLite.visibility = View.GONE
-            powerMenuLite.setOnClickListener(null)
-        }
     }
 
     private fun updateView() {
         mView.updateEverything(isTunerEnabled(), multiUserSwitchController.isMultiUserEnabled)
-        updatePMLiteIconVisibility()
     }
 
     override fun onViewDetached() {
@@ -282,5 +214,5 @@ class FooterActionsController @Inject constructor(
         }
     }
 
-    private fun isTunerEnabled() = false
+    private fun isTunerEnabled() = tunerService.isTunerEnabled
 }

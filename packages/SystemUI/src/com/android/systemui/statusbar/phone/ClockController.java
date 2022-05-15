@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The LineageOS Project
+ * Copyright (C) 2018 The OuvrirOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,22 +17,24 @@
 package com.android.systemui.statusbar.phone;
 
 import android.content.Context;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
+import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
 import com.android.systemui.statusbar.policy.Clock;
 import com.android.systemui.tuner.TunerService;
+
+import ouvriros.providers.OuvrirSettings;
 
 public class ClockController implements TunerService.Tunable {
 
     private static final String TAG = "ClockController";
 
     private static final String CLOCK_POSITION =
-            "system:" + Settings.System.STATUS_BAR_CLOCK;
+            "ouvrirsystem:" + OuvrirSettings.System.STATUS_BAR_CLOCK;
 
     private static final int CLOCK_POSITION_RIGHT = 0;
     private static final int CLOCK_POSITION_CENTER = 1;
@@ -71,8 +73,10 @@ public class ClockController implements TunerService.Tunable {
 
     private void updateActiveClock() {
         mActiveClock.setClockVisibleByUser(false);
+        removeDarkReceiver();
         mActiveClock = getClock();
         mActiveClock.setClockVisibleByUser(true);
+        addDarkReceiver();
 
         // Override any previous setting
         mActiveClock.setClockVisibleByUser(!mBlackListed);
@@ -89,5 +93,13 @@ public class ClockController implements TunerService.Tunable {
                     mContext, newValue).contains("clock");
         }
         updateActiveClock();
+    }
+
+    public void addDarkReceiver() {
+        Dependency.get(DarkIconDispatcher.class).addDarkReceiver(mActiveClock);
+    }
+
+    public void removeDarkReceiver() {
+        Dependency.get(DarkIconDispatcher.class).removeDarkReceiver(mActiveClock);
     }
 }

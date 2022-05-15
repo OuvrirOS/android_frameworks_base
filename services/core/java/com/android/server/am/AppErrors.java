@@ -629,11 +629,6 @@ class AppErrors {
                 return;
             }
 
-            // Add paste content for Pasty option
-            data.paste = "time: " + timeMillis + "\n" +
-            "msg: " + longMsg + "\n" +
-            "stacktrace: " + stackTrace;
-
             final Message msg = Message.obtain();
             msg.what = ActivityManagerService.SHOW_ERROR_UI_MSG;
 
@@ -1078,10 +1073,7 @@ class AppErrors {
             boolean showBackground = Settings.Secure.getIntForUser(mContext.getContentResolver(),
                     Settings.Secure.ANR_SHOW_BACKGROUND, 0,
                     mService.mUserController.getCurrentUserId()) != 0;
-            final boolean anrSilenced = mAppsNotReportingCrashes != null
-                    && mAppsNotReportingCrashes.contains(proc.info.packageName);
-            if (!anrSilenced &&
-                    (mService.mAtmInternal.canShowErrorDialogs() || showBackground)) {
+            if (mService.mAtmInternal.canShowErrorDialogs() || showBackground) {
                 AnrController anrController = errState.getDialogController().getAnrController();
                 if (anrController == null) {
                     errState.getDialogController().showAnrDialogs(data);
@@ -1106,7 +1098,7 @@ class AppErrors {
                 MetricsLogger.action(mContext, MetricsProto.MetricsEvent.ACTION_APP_ANR,
                         AppNotRespondingDialog.CANT_SHOW);
                 // Just kill the app if there is no dialog to be shown.
-                doKill = !anrSilenced;
+                doKill = true;
             }
         }
         if (doKill) {

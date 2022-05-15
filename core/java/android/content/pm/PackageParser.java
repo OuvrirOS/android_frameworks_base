@@ -96,6 +96,8 @@ import com.android.internal.os.ClassLoaderFactory;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.XmlUtils;
 
+import com.nvidia.NvAppProfileService;
+
 import libcore.io.IoUtils;
 import libcore.util.EmptyArray;
 import libcore.util.HexEncoding;
@@ -281,8 +283,6 @@ public class PackageParser {
     @UnsupportedAppUsage
     public static final PackageParser.NewPermissionInfo NEW_PERMISSIONS[] =
         new PackageParser.NewPermissionInfo[] {
-            new PackageParser.NewPermissionInfo(android.Manifest.permission.OTHER_SENSORS,
-                    android.os.Build.VERSION_CODES.CUR_DEVELOPMENT + 1, 0),
             new PackageParser.NewPermissionInfo(android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
                     android.os.Build.VERSION_CODES.DONUT, 0),
             new PackageParser.NewPermissionInfo(android.Manifest.permission.READ_PHONE_STATE,
@@ -603,6 +603,7 @@ public class PackageParser {
      * a package.
      */
     public interface Callback {
+        NvAppProfileService getAppProfileService();
         boolean hasFeature(String feature);
     }
 
@@ -615,6 +616,10 @@ public class PackageParser {
 
         public CallbackImpl(PackageManager pm) {
             mPm = pm;
+        }
+
+        @Override public NvAppProfileService getAppProfileService() {
+            return mPm.getAppProfileService();
         }
 
         @Override public boolean hasFeature(String feature) {
@@ -3583,7 +3588,11 @@ public class PackageParser {
             ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_ALLOW_CLEAR_USER_DATA_ON_FAILED_RESTORE;
         }
 
-        ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE;
+        if (sa.getBoolean(
+                R.styleable.AndroidManifestApplication_allowAudioPlaybackCapture,
+                owner.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.Q)) {
+            ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE;
+        }
 
         if (sa.getBoolean(
                 R.styleable.AndroidManifestApplication_requestLegacyExternalStorage,
@@ -4617,7 +4626,43 @@ public class PackageParser {
     }
 
     private void setActivityResizeMode(ActivityInfo aInfo, TypedArray sa, Package owner) {
-        aInfo.resizeMode = RESIZE_MODE_RESIZEABLE;
+        final boolean appExplicitDefault = (owner.applicationInfo.privateFlags
+                & (PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE
+                | PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_UNRESIZEABLE)) != 0;
+
+        if (sa.hasValue(R.styleable.AndroidManifestActivity_resizeableActivity)
+                || appExplicitDefault) {
+            // Activity or app explicitly set if it is resizeable or not;
+            final boolean appResizeable = (owner.applicationInfo.privateFlags
+                    & PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE) != 0;
+            if (sa.getBoolean(R.styleable.AndroidManifestActivity_resizeableActivity,
+                    appResizeable)) {
+                aInfo.resizeMode = RESIZE_MODE_RESIZEABLE;
+            } else {
+                aInfo.resizeMode = RESIZE_MODE_UNRESIZEABLE;
+            }
+            return;
+        }
+
+        if ((owner.applicationInfo.privateFlags
+                & PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION) != 0) {
+            // The activity or app didn't explicitly set the resizing option, however we want to
+            // make it resize due to the sdk version it is targeting.
+            aInfo.resizeMode = RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION;
+            return;
+        }
+
+        // resize preference isn't set and target sdk version doesn't support resizing apps by
+        // default. For the app to be resizeable if it isn't fixed orientation or immersive.
+        if (aInfo.isFixedOrientationPortrait()) {
+            aInfo.resizeMode = RESIZE_MODE_FORCE_RESIZABLE_PORTRAIT_ONLY;
+        } else if (aInfo.isFixedOrientationLandscape()) {
+            aInfo.resizeMode = RESIZE_MODE_FORCE_RESIZABLE_LANDSCAPE_ONLY;
+        } else if (aInfo.isFixedOrientation()) {
+            aInfo.resizeMode = RESIZE_MODE_FORCE_RESIZABLE_PRESERVE_ORIENTATION;
+        } else {
+            aInfo.resizeMode = RESIZE_MODE_FORCE_RESIZEABLE;
+        }
     }
 
     /**
@@ -4625,8 +4670,10 @@ public class PackageParser {
      * ratio set.
      */
     private void setMaxAspectRatio(Package owner) {
-        // Start at an unlimited aspect ratio unless we get a more restrictive one
-        float maxAspectRatio = 0;
+        // Default to (1.86) 16.7:9 aspect ratio for pre-O apps and unset for O and greater.
+        // NOTE: 16.7:9 was the max aspect ratio Android devices can support pre-O per the CDD.
+        float maxAspectRatio = owner.applicationInfo.targetSdkVersion < O
+                ? DEFAULT_PRE_O_MAX_ASPECT_RATIO : 0;
 
         if (owner.applicationInfo.maxAspectRatio != 0) {
             // Use the application max aspect ration as default if set.

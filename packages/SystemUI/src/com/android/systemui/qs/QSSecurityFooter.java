@@ -60,18 +60,12 @@ import com.android.systemui.qs.dagger.QSScope;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.SecurityController;
-import com.android.systemui.tuner.TunerService;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 
 @QSScope
-class QSSecurityFooter implements OnClickListener, DialogInterface.OnClickListener,
-        TunerService.Tunable {
-
-    private static final String QS_FOOTER_WARNINGS =
-            "system:" + Settings.System.QS_FOOTER_WARNINGS;
-
+class QSSecurityFooter implements OnClickListener, DialogInterface.OnClickListener {
     protected static final String TAG = "QSSecurityFooter";
     protected static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
     private static final boolean DEBUG_FORCE_VISIBLE = false;
@@ -95,13 +89,10 @@ class QSSecurityFooter implements OnClickListener, DialogInterface.OnClickListen
     private int mFooterIconId;
     private Drawable mPrimaryFooterIconDrawable;
 
-    private boolean mShowWarnings;
-
     @Inject
     QSSecurityFooter(@Named(QS_SECURITY_FOOTER_VIEW) View rootView,
             UserTracker userTracker, @Main Handler mainHandler, ActivityStarter activityStarter,
-            SecurityController securityController, @Background Looper bgLooper,
-            TunerService tunerService) {
+            SecurityController securityController, @Background Looper bgLooper) {
         mRootView = rootView;
         mRootView.setOnClickListener(this);
         mFooterText = mRootView.findViewById(R.id.footer_text);
@@ -113,21 +104,6 @@ class QSSecurityFooter implements OnClickListener, DialogInterface.OnClickListen
         mSecurityController = securityController;
         mHandler = new H(bgLooper);
         mUserTracker = userTracker;
-        tunerService.addTunable(this,
-                QS_FOOTER_WARNINGS);
-    }
-
-    @Override
-    public void onTuningChanged(String key, String newValue) {
-        switch (key) {
-            case QS_FOOTER_WARNINGS:
-                mShowWarnings =
-                        TunerService.parseIntegerSwitch(newValue, true);
-                refreshState();
-                break;
-            default:
-                break;
-        }
     }
 
     public void setHostEnvironment(QSTileHost host) {
@@ -213,12 +189,12 @@ class QSSecurityFooter implements OnClickListener, DialogInterface.OnClickListen
         final boolean hasDisclosableWorkProfilePolicy = hasCACertsInWorkProfile
                 || vpnNameWorkProfile != null || (hasWorkProfile && isNetworkLoggingEnabled);
         // Update visibility of footer
-        mIsVisible = mShowWarnings && ((isDeviceManaged && !isDemoDevice)
+        mIsVisible = (isDeviceManaged && !isDemoDevice)
                 || hasCACerts
                 || vpnName != null
                 || isProfileOwnerOfOrganizationOwnedDevice
                 || isParentalControlsEnabled
-                || (hasDisclosableWorkProfilePolicy && isWorkProfileOn));
+                || (hasDisclosableWorkProfilePolicy && isWorkProfileOn);
         // Update the view to be untappable if the device is an organization-owned device with a
         // managed profile and there is either:
         // a) no policy set which requires a privacy disclosure.

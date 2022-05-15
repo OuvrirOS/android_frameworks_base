@@ -40,6 +40,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.database.ContentObserver;
 import android.debug.AdbManagerInternal;
 import android.debug.AdbNotifications;
 import android.debug.AdbTransportType;
@@ -53,6 +54,7 @@ import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.hardware.usb.UsbPort;
 import android.hardware.usb.UsbPortStatus;
+import android.hardware.usb.V1_3.IUsb;
 import android.hardware.usb.gadget.V1_0.GadgetFunction;
 import android.hardware.usb.gadget.V1_0.IUsbGadget;
 import android.hardware.usb.gadget.V1_0.Status;
@@ -93,6 +95,9 @@ import com.android.internal.util.dump.DualDumpOutputStream;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
 import com.android.server.wm.ActivityTaskManagerInternal;
+
+import ouvriros.providers.OuvrirSettings;
+import vendor.ouvrir.trust.V1_0.IUsbRestrict;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -208,16 +213,6 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     private static Set<Integer> sDenyInterfaces;
     private HashMap<Long, FileDescriptor> mControlFds;
 
-    /* Omni add-on */
-    private static boolean mUseMultiUsbController;
-    private static String udc_change;
-    private static final long FUNCTION_UDC_SWITCH = 128;
-    private static final String USB_CONTROLLER_PROPERTY = "sys.usb.controller";
-    private static final String UDC1_MODE = "/sys/devices/platform/soc/a600000.ssusb/mode";
-    private static final String UDC2_MODE = "/sys/devices/platform/soc/a800000.ssusb/mode";
-    private static final String UDC1_NAME_MATCH = "DEVPATH=/devices/platform/soc/a600000.ssusb/a600000.dwc3";
-    private static final String UDC2_NAME_MATCH = "DEVPATH=/devices/platform/soc/a800000.ssusb/a800000.dwc3";
-
     static {
         sDenyInterfaces = new HashSet<>();
         sDenyInterfaces.add(UsbConstants.USB_CLASS_AUDIO);
@@ -260,17 +255,6 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 mHandler.setStartAccessoryTrue();
                 startAccessoryMode();
             }
-            if (mUseMultiUsbController) {
-                String udcname = event.get("UDC_NAME");
-                if (udcname != null) {
-                    String controller = SystemProperties.get(USB_CONTROLLER_PROPERTY);
-                    if (!controller.equals(udcname)) {
-                        String unused = udc_change = udcname;
-                        setCurrentFunctions(FUNCTION_UDC_SWITCH);
-                    }
-                    Slog.i(TAG, "Controller=" + controller + " UDC_NAME=" + udcname);
-                }
-            }
         }
     }
 
@@ -284,7 +268,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     + " user:" + userHandle);
         }
         // We are unlocked when the keyguard is down or non-secure.
-        mHandler.sendMessage(MSG_UPDATE_SCREEN_LOCK, (isShowing && secure));
+        mHandler.removeMessages(MSG_UPDATE_SCREEN_LOCK);
+        mHandler.sendMessageDelayed(MSG_UPDATE_SCREEN_LOCK, isShowing, secure, 250);
     }
 
     @Override
@@ -398,17 +383,21 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         mContext.registerReceiver(languageChangedReceiver,
                 new IntentFilter(Intent.ACTION_LOCALE_CHANGED));
 
-        mUseMultiUsbController = mContext.getResources().getBoolean(
-                                    com.android.internal.R.bool.config_switchUsbController);
-
         // Watch for USB configuration changes
         mUEventObserver = new UsbUEventObserver();
         mUEventObserver.startObserving(USB_STATE_MATCH);
         mUEventObserver.startObserving(ACCESSORY_START_MATCH);
-        if (mUseMultiUsbController) {
-            mUEventObserver.startObserving(UDC1_NAME_MATCH);
-            mUEventObserver.startObserving(UDC2_NAME_MATCH);
-        }
+
+        mContentResolver.registerContentObserver(
+                OuvrirSettings.Global.getUriFor(OuvrirSettings.Global.TRUST_RESTRICT_USB),
+                false,
+                new ContentObserver(null) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        mHandler.setTrustRestrictUsb();
+                    }
+                }
+        );
     }
 
     UsbProfileGroupSettingsManager getCurrentSettings() {
@@ -531,6 +520,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         private boolean mHideUsbNotification;
         private boolean mSupportsAllCombinations;
         private boolean mScreenLocked;
+        private boolean mIsKeyguardShowing;
         private boolean mSystemReady;
         private Intent mBroadcastedIntent;
         private boolean mPendingBootBroadcast;
@@ -567,6 +557,9 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         protected int mUsbSpeed;
         protected int mCurrentGadgetHalVersion;
 
+        private IUsb mUsb;
+        private IUsbRestrict mUsbRestrictor;
+
         /**
          * The persistent property which stores whether adb is enabled or not.
          * May also contain vendor-specific default functions for testing purposes.
@@ -584,6 +577,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
             mCurrentUser = ActivityManager.getCurrentUser();
             mScreenLocked = true;
+            mIsKeyguardShowing = true;
 
             mSettings = getPinnedSharedPrefs(mContext);
             if (mSettings == null) {
@@ -604,6 +598,19 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             boolean massStorageSupported = primary != null && primary.allowMassStorage();
             mUseUsbNotification = !massStorageSupported && mContext.getResources().getBoolean(
                     com.android.internal.R.bool.config_usbChargingMessage);
+
+            try {
+                mUsb = IUsb.getService();
+            } catch (NoSuchElementException | RemoteException ignored) {
+                // Try Usb Restrict
+            }
+            if (mUsb == null) {
+                try {
+                    mUsbRestrictor = IUsbRestrict.getService();
+                } catch (NoSuchElementException | RemoteException ignored) {
+                    // This feature is not supported
+                }
+            }
         }
 
         public void sendMessage(int what, boolean arg) {
@@ -640,6 +647,14 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             removeMessages(what);
             Message m = Message.obtain(this, what);
             m.arg1 = (arg ? 1 : 0);
+            sendMessageDelayed(m, delayMillis);
+        }
+
+        public void sendMessageDelayed(int what, boolean arg1, boolean arg2, long delayMillis) {
+            removeMessages(what);
+            Message m = Message.obtain(this, what);
+            m.arg1 = (arg1 ? 1 : 0);
+            m.arg2 = (arg2 ? 1 : 0);
             sendMessageDelayed(m, delayMillis);
         }
 
@@ -913,6 +928,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     mConnected = (msg.arg1 == 1);
                     mConfigured = (msg.arg2 == 1);
 
+                    setTrustRestrictUsb();
+
                     updateUsbNotification(false);
                     updateAdbNotification(false);
                     if (mBootCompleted) {
@@ -967,6 +984,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                         mSupportsAllCombinations = false;
                     }
 
+                    setTrustRestrictUsb();
+
                     mAudioAccessorySupported = port.isModeSupported(MODE_AUDIO_ACCESSORY);
 
                     args.recycle();
@@ -1020,20 +1039,6 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     break;
                 case MSG_SET_CURRENT_FUNCTIONS:
                     long functions = (Long) msg.obj;
-                    if (mUseMultiUsbController) {
-                        if (FUNCTION_UDC_SWITCH == functions) {
-                            SystemProperties.set(USB_CONTROLLER_PROPERTY, udc_change);
-                            if (!mScreenLocked) {
-                                long unlockfunctions = mScreenUnlockedFunctions;
-                                if (unlockfunctions != 0) {
-                                    setEnabledFunctions(unlockfunctions, true);
-                                    break;
-                                }
-                            }
-                            setEnabledFunctions(0, true);
-                            break;
-                        }
-                    }
                     setEnabledFunctions(functions, false);
                     break;
                 case MSG_SET_SCREEN_UNLOCKED_FUNCTIONS:
@@ -1053,10 +1058,13 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     }
                     break;
                 case MSG_UPDATE_SCREEN_LOCK:
-                    if (msg.arg1 == 1 == mScreenLocked) {
+                    mIsKeyguardShowing = msg.arg1 == 1;
+                    boolean secure = msg.arg2 == 1;
+                    setTrustRestrictUsb();
+                    if ((mIsKeyguardShowing && secure) == mScreenLocked) {
                         break;
                     }
-                    mScreenLocked = msg.arg1 == 1;
+                    mScreenLocked = (mIsKeyguardShowing && secure);
                     if (!mBootCompleted) {
                         break;
                     }
@@ -1147,38 +1155,17 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         protected void finishBoot() {
             if (mBootCompleted && mCurrentUsbFunctionsReceived && mSystemReady) {
-                boolean switchudc = false;
+                setTrustRestrictUsb();
+
                 if (mPendingBootBroadcast) {
                     updateUsbStateBroadcastIfNeeded(getAppliedFunctions(mCurrentFunctions));
                     mPendingBootBroadcast = false;
-                }
-                if (mUseMultiUsbController) {
-                    String controller = SystemProperties.get(USB_CONTROLLER_PROPERTY);
-                    try {
-                        String usb1mode = FileUtils.readTextFile(new File(UDC1_MODE), 0, null).trim();
-                        String usb2mode = FileUtils.readTextFile(new File(UDC2_MODE), 0, null).trim();
-                        if ("peripheral".equals(usb1mode) && !"a600000.dwc3".equals(controller)) {
-                            switchudc = true;
-                            SystemProperties.set(USB_CONTROLLER_PROPERTY, "a600000.dwc3");
-                        } else if ("peripheral".equals(usb2mode) && !"a800000.dwc3".equals(controller)) {
-                            switchudc = true;
-                            SystemProperties.set(USB_CONTROLLER_PROPERTY, "a800000.dwc3");
-                        }
-                        String str = TAG;
-                        Slog.i(str, "usb1_mode=" + usb1mode + " usb2_mode=" + usb2mode + " controller=" + controller);
-                    } catch (IOException e) {
-                        Slog.e(TAG, "Error read usb mode", e);
-                    }
                 }
                 if (!mScreenLocked
                         && mScreenUnlockedFunctions != UsbManager.FUNCTION_NONE) {
                     setScreenUnlockedFunctions();
                 } else {
-                    if (mUseMultiUsbController) {
-                        setEnabledFunctions(UsbManager.FUNCTION_NONE, switchudc);
-                    } else {
-                        setEnabledFunctions(UsbManager.FUNCTION_NONE, false);
-                    }
+                    setEnabledFunctions(UsbManager.FUNCTION_NONE, false);
                 }
                 if (mCurrentAccessory != null) {
                     mUsbDeviceManager.getCurrentSettings().accessoryAttached(mCurrentAccessory);
@@ -1523,6 +1510,27 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             mAccessoryConnectionStartTime = 0L;
             mSendStringCount = 0;
             mStartAccessory = false;
+        }
+
+        public void setTrustRestrictUsb() {
+            final int restrictUsb = OuvrirSettings.Global.getInt(mContentResolver,
+                    OuvrirSettings.Global.TRUST_RESTRICT_USB, 1);
+            // Effective immediately, ejects any connected USB devices.
+            // If the restriction is set to "only when locked", only execute once USB is
+            // disconnected and keyguard is showing, to avoid ejecting connected devices
+            // on lock
+            final boolean usbConnected = mConnected || mHostConnected;
+            final boolean shouldRestrict = (restrictUsb == 1 && mIsKeyguardShowing && !usbConnected)
+                    || restrictUsb == 2;
+            try {
+                if (mUsb != null) {
+                    mUsb.enableUsbDataSignal(!shouldRestrict);
+                } else if (mUsbRestrictor != null) {
+                    mUsbRestrictor.setEnabled(shouldRestrict);
+                }
+            } catch (RemoteException ignored) {
+                // This feature is not supported
+            }
         }
     }
 

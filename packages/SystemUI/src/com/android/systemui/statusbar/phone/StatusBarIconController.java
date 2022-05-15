@@ -16,7 +16,6 @@ package com.android.systemui.statusbar.phone;
 
 import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_ICON;
 import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_MOBILE;
-import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_NETWORK_TRAFFIC;
 import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_WIFI;
 
 import android.annotation.Nullable;
@@ -48,7 +47,6 @@ import com.android.systemui.statusbar.StatusIconDisplayable;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.CallIndicatorIconState;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.MobileIconState;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.WifiIconState;
-import com.android.systemui.statusbar.policy.NetworkTrafficSB;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -165,10 +163,8 @@ public interface StatusBarIconController {
 
         @Override
         public void onSetIcon(int viewIndex, StatusBarIcon icon) {
-            View view = mGroup.getChildAt(viewIndex);
-            if (view instanceof StatusBarIconView) {
-                ((StatusBarIconView) view).set(icon);
-            }
+            super.onSetIcon(viewIndex, icon);
+            mDarkIconDispatcher.applyDark((DarkReceiver) mGroup.getChildAt(viewIndex));
         }
 
         @Override
@@ -239,7 +235,7 @@ public interface StatusBarIconController {
     /**
      * Turns info from StatusBarIconController into ImageViews in a ViewGroup.
      */
-    class IconManager implements DemoModeCommandReceiver  {
+    class IconManager implements DemoModeCommandReceiver {
         private final FeatureFlags mFeatureFlags;
         protected final ViewGroup mGroup;
         protected final Context mContext;
@@ -251,17 +247,15 @@ public interface StatusBarIconController {
         protected boolean mDemoable = true;
         private boolean mIsInDemoMode;
         protected DemoStatusIcons mDemoStatusIcons;
-            
-        protected ArrayList<String> mBlockList = new ArrayList<>();
 
-        private boolean mIsOldSignalStyle = false;
+        protected ArrayList<String> mBlockList = new ArrayList<>();
 
         public IconManager(ViewGroup group, FeatureFlags featureFlags) {
             mFeatureFlags = featureFlags;
             mGroup = group;
             mContext = group.getContext();
             mIconSize = mContext.getResources().getDimensionPixelSize(
-                com.android.internal.R.dimen.status_bar_icon_size);
+                    com.android.internal.R.dimen.status_bar_icon_size);
         }
 
         public boolean isDemoable() {
@@ -310,9 +304,6 @@ public interface StatusBarIconController {
 
                 case TYPE_MOBILE:
                     return addMobileIcon(index, slot, holder.getMobileState());
-
-                case TYPE_NETWORK_TRAFFIC:
-                    return addNetworkTraffic(index, slot);
             }
 
             return null;
@@ -339,18 +330,11 @@ public interface StatusBarIconController {
             return view;
         }
 
-        protected NetworkTrafficSB addNetworkTraffic(int index, String slot) {
-            NetworkTrafficSB view = onCreateNetworkTraffic(slot);
-            mGroup.addView(view, index, onCreateLayoutParams());
-            return view;
-        }
-
         @VisibleForTesting
         protected StatusBarMobileView addMobileIcon(int index, String slot, MobileIconState state) {
             StatusBarMobileView view = onCreateStatusBarMobileView(slot);
             view.applyMobileState(state);
             mGroup.addView(view, index, onCreateLayoutParams());
-            view.updateDisplayType(mIsOldSignalStyle);
 
             if (mIsInDemoMode) {
                 mDemoStatusIcons.addMobileView(state);
@@ -370,12 +354,6 @@ public interface StatusBarIconController {
         private StatusBarMobileView onCreateStatusBarMobileView(String slot) {
             StatusBarMobileView view = StatusBarMobileView.fromContext(
                             mContext, slot, mFeatureFlags.isCombinedStatusBarSignalIconsEnabled());
-            return view;
-        }
-
-        private NetworkTrafficSB onCreateNetworkTraffic(String slot) {
-            NetworkTrafficSB view = new NetworkTrafficSB(mContext);
-            view.setPadding(2, 0, 2, 0);
             return view;
         }
 
@@ -420,10 +398,8 @@ public interface StatusBarIconController {
         }
 
         public void onSetIcon(int viewIndex, StatusBarIcon icon) {
-            View view = mGroup.getChildAt(viewIndex);
-            if (view instanceof StatusBarIconView) {
-                ((StatusBarIconView) view).set(icon);
-            }
+            StatusBarIconView view = (StatusBarIconView) mGroup.getChildAt(viewIndex);
+            view.set(icon);
         }
 
         public void onSetIconHolder(int viewIndex, StatusBarIconHolder holder) {
@@ -498,27 +474,6 @@ public interface StatusBarIconController {
 
         protected DemoStatusIcons createDemoStatusIcons() {
             return new DemoStatusIcons((LinearLayout) mGroup, mIconSize, mFeatureFlags);
-        }
-
-        protected void setMobileSignalStyle(boolean isOldSignalStyle) {
-            mIsOldSignalStyle = isOldSignalStyle;
-        }
-
-        protected void updateMobileIconStyle() {
-            for (int i = 0; i < mGroup.getChildCount(); i++) {
-                final View child = mGroup.getChildAt(i);
-                if (child instanceof StatusBarMobileView) {
-                    ((StatusBarMobileView) child).updateDisplayType(mIsOldSignalStyle);
-                }
-            }
-        }
-
-        public void setKeyguardShowing(boolean showing) {
-            for (int i = 0; i < mGroup.getChildCount(); i++) {
-                if (mGroup.getChildAt(i) instanceof NetworkTrafficSB) {
-                    ((NetworkTrafficSB)mGroup.getChildAt(i)).setKeyguardShowing(showing);
-                }
-            }
         }
     }
 }

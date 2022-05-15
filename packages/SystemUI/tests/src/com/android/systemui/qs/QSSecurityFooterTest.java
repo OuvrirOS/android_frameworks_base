@@ -53,7 +53,6 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.SecurityController;
-import com.android.systemui.tuner.TunerService;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -95,8 +94,6 @@ public class QSSecurityFooterTest extends SysuiTestCase {
     private UserTracker mUserTracker;
     @Mock
     private ActivityStarter mActivityStarter;
-    @Mock
-    private TunerService mTunerService;
 
     @Before
     public void setUp() {
@@ -107,7 +104,7 @@ public class QSSecurityFooterTest extends SysuiTestCase {
                 .replace("ImageView", TestableImageView.class)
                 .build().inflate(R.layout.quick_settings_security_footer, null, false);
         mFooter = new QSSecurityFooter(mRootView, mUserTracker, new Handler(looper),
-                mActivityStarter, mSecurityController, looper, mTunerService);
+                mActivityStarter, mSecurityController, looper);
         mFooterText = mRootView.findViewById(R.id.footer_text);
         mPrimaryFooterIcon = mRootView.findViewById(R.id.primary_footer_icon);
         mFooter.setHostEnvironment(null);

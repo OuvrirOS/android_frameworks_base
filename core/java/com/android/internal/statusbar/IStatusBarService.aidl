@@ -41,7 +41,6 @@ interface IStatusBarService
     @UnsupportedAppUsage
     void collapsePanels();
     void togglePanel();
-    void toggleSettingsPanel();
     @UnsupportedAppUsage
     void disable(int what, IBinder token, String pkg);
     void disableForUser(int what, IBinder token, String pkg, int userId);
@@ -94,8 +93,7 @@ interface IStatusBarService
      * These methods are needed for global actions control which the UI is shown in sysui.
      */
     void shutdown();
-    void reboot(boolean safeMode);
-    void advancedReboot(String mode);
+    void reboot(boolean safeMode, String reason);
 
     void addTile(in ComponentName tile);
     void remTile(in ComponentName tile);
@@ -164,20 +162,4 @@ interface IStatusBarService
      * Starts the default assistant app.
      */
     void startAssist(in Bundle args);
-
-    /**
-     * Evolution X additions
-     */
-    void toggleCameraFlash();
-    void toggleRecentApps();
-    void toggleSplitScreen();
-    void preloadRecentApps();
-    void cancelPreloadRecentApps();
-    void killForegroundApp();
-    void screenPinningStateChanged(boolean enabled);
-
-    /**
-     * Used to block or unblock usage of gestural navigation
-     */
-    void setBlockedGesturalNavigation(boolean blocked);
 }

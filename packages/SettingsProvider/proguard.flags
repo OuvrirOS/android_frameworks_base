@@ -1,0 +1,3 @@
+-keepclassmembers class ouvriros.providers.OuvrirSettings {
+    public <fields>;
+}

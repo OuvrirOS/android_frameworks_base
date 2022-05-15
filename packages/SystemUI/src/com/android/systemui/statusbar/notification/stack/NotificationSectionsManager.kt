@@ -72,7 +72,6 @@ class NotificationSectionsManager @Inject internal constructor(
 
     private lateinit var parent: NotificationStackScrollLayout
     private var initialized = false
-    private var mShowHeaders = true
 
     @VisibleForTesting
     val silentHeaderView: SectionHeaderView?
@@ -95,10 +94,9 @@ class NotificationSectionsManager @Inject internal constructor(
         private set
 
     /** Must be called before use.  */
-    fun initialize(parent: NotificationStackScrollLayout, layoutInflater: LayoutInflater, showHeaders: Boolean) {
+    fun initialize(parent: NotificationStackScrollLayout, layoutInflater: LayoutInflater) {
         check(!initialized) { "NotificationSectionsManager already initialized" }
         initialized = true
-        mShowHeaders = showHeaders
         this.parent = parent
         reinflateViews(layoutInflater)
         configurationController.addCallback(configurationListener)
@@ -133,23 +131,13 @@ class NotificationSectionsManager @Inject internal constructor(
      * Reinflates the entire notification header, including all decoration views.
      */
     fun reinflateViews(layoutInflater: LayoutInflater) {
-        if (mShowHeaders) {
-            silentHeaderController.reinflateView(parent)
-            alertingHeaderController.reinflateView(parent)
-            peopleHeaderController.reinflateView(parent)
-            incomingHeaderController.reinflateView(parent)
-        }
+        silentHeaderController.reinflateView(parent)
+        alertingHeaderController.reinflateView(parent)
+        peopleHeaderController.reinflateView(parent)
+        incomingHeaderController.reinflateView(parent)
         mediaControlsView =
                 reinflateView(mediaControlsView, layoutInflater, R.layout.keyguard_media_header)
         keyguardMediaController.attachSinglePaneContainer(mediaControlsView)
-    }
-
-    fun setHeadersVisibility(visible: Boolean) {
-        if  (mShowHeaders != visible) {
-            mShowHeaders = visible
-            reinflateViews(LayoutInflater.from(parent.context))
-            if (visible) updateSectionBoundaries("headers toggled on")
-        }
     }
 
     override fun beginsSection(view: View, previous: View?): Boolean =
@@ -265,7 +253,6 @@ class NotificationSectionsManager @Inject internal constructor(
         // target, but won't be once they are moved / removed after the pass has completed.
 
         val showHeaders = statusBarStateController.state != StatusBarState.KEYGUARD
-                && mShowHeaders
         val usingMediaControls = sectionsFeatureManager.isMediaControlsEnabled()
 
         val mediaState = mediaControlsView?.let(::expandableViewHeaderState)

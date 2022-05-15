@@ -7433,17 +7433,7 @@ message MetricsEvent {
     // OS: Q
     SETTINGS_AWARE_DISPLAY = 1750;
     // ---- End Q Constants, all Q constants go above this line ----
-    // Panel for Mobile Data
-    PANEL_MOBILE_DATA = 2002;
-
-    // Panel for Bluetooth
-    PANEL_BLUETOOTH = 2003;
-
     // Add new aosp constants above this line.
     // END OF AOSP CONSTANTS
-
-    // Dot Metrics
-    CUSTOM = 2772;
-    CUSTOM_TILES = 2775;
   }
 }

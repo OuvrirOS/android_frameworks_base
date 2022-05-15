@@ -1346,14 +1346,14 @@ public class StorageManager {
     /** {@hide} */
     public static Pair<String, Long> getPrimaryStoragePathAndSize() {
         return Pair.create(null,
-                Environment.getDataDirectory().getTotalSpace()
-                    + Environment.getRootDirectory().getTotalSpace());
+                FileUtils.roundStorageSize(Environment.getDataDirectory().getTotalSpace()
+                    + Environment.getRootDirectory().getTotalSpace()));
     }
 
     /** {@hide} */
     public long getPrimaryStorageSize() {
-        return Environment.getDataDirectory().getTotalSpace()
-                + Environment.getRootDirectory().getTotalSpace();
+        return FileUtils.roundStorageSize(Environment.getDataDirectory().getTotalSpace()
+                + Environment.getRootDirectory().getTotalSpace());
     }
 
     /** {@hide} */

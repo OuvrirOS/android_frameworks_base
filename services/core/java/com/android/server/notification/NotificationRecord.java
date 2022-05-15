@@ -204,8 +204,6 @@ public final class NotificationRecord {
     // are sorted.
     private boolean mPendingLogUpdate = false;
 
-    private boolean mIsBubbleUpSuppressedByAppLock = false;
-
     public NotificationRecord(Context context, StatusBarNotification sbn,
             NotificationChannel channel) {
         this.sbn = sbn;
@@ -265,36 +263,27 @@ public final class NotificationRecord {
     }
 
     private Light calculateLights() {
-        int defaultLightColor = mContext.getResources().getColor(
-                com.android.internal.R.color.config_defaultNotificationColor);
+        // Ouvrir lights will set the default color later
+        int defaultLightColor = 0;
         int defaultLightOn = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultNotificationLedOn);
         int defaultLightOff = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultNotificationLedOff);
-        int userSetLightColor = getChannel().getLightColor();
-        int userSetLightOnTime = getChannel().getLightOnTime();
-        int userSetLightOffTime = getChannel().getLightOffTime();
-        int channelLightColor = userSetLightColor != 0 ? userSetLightColor
-                : defaultLightColor;
-        int channelLightOnTime = userSetLightOnTime != 0 ? userSetLightOnTime
-                : defaultLightOn;
-        int channelLightOffTime = userSetLightOffTime != 0 ? userSetLightOffTime
-                : defaultLightOff;
-        Light light = getChannel().shouldShowLights() ? new Light(channelLightColor,
-                channelLightOnTime, channelLightOffTime) : null;
 
+        int channelLightColor = getChannel().getLightColor() != 0 ? getChannel().getLightColor()
+                : defaultLightColor;
+        Light light = getChannel().shouldShowLights() ? new Light(channelLightColor,
+                defaultLightOn, defaultLightOff) : null;
         if (mPreChannelsNotification
                 && (getChannel().getUserLockedFields()
                 & NotificationChannel.USER_LOCKED_LIGHTS) == 0) {
             final Notification notification = getSbn().getNotification();
             if ((notification.flags & Notification.FLAG_SHOW_LIGHTS) != 0) {
-                light = new Light(userSetLightColor != 0 ? userSetLightColor : notification.ledARGB,
-                        userSetLightOnTime != 0 ? userSetLightOnTime : notification.ledOnMS,
-                        userSetLightOffTime != 0 ? userSetLightOffTime : notification.ledOffMS);
+                light = new Light(notification.ledARGB, notification.ledOnMS,
+                        notification.ledOffMS);
                 if ((notification.defaults & Notification.DEFAULT_LIGHTS) != 0) {
-                    light = new Light(userSetLightColor != 0 ? userSetLightColor : defaultLightColor,
-                        userSetLightOnTime != 0 ? userSetLightOnTime : defaultLightOn,
-                        userSetLightOffTime != 0 ? userSetLightOffTime : defaultLightOff);
+                    light = new Light(defaultLightColor, defaultLightOn,
+                            defaultLightOff);
                 }
             } else {
                 light = null;
@@ -1534,14 +1523,6 @@ public final class NotificationRecord {
     // setPendingLogUpdate to false to make sure other callers don't also do so.
     protected boolean hasPendingLogUpdate() {
         return mPendingLogUpdate;
-    }
-
-    public void setBubbleUpSuppressedByAppLock(boolean suppressed) {
-        mIsBubbleUpSuppressedByAppLock = suppressed;
-    }
-
-    public boolean isBubbleUpSuppressedByAppLock() {
-        return mIsBubbleUpSuppressedByAppLock;
     }
 
     @VisibleForTesting

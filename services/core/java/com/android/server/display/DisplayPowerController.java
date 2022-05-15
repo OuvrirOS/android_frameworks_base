@@ -21,7 +21,6 @@ import android.animation.ObjectAnimator;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.pm.ParceledListSlice;
 import android.content.res.Resources;
@@ -69,7 +68,11 @@ import com.android.server.display.utils.SensorUtils;
 import com.android.server.display.whitebalance.DisplayWhiteBalanceController;
 import com.android.server.display.whitebalance.DisplayWhiteBalanceFactory;
 import com.android.server.display.whitebalance.DisplayWhiteBalanceSettings;
+import com.android.server.lights.LightsManager;
+import com.android.server.lights.LogicalLight;
 import com.android.server.policy.WindowManagerPolicy;
+
+import ouvriros.providers.OuvrirSettings;
 
 import java.io.PrintWriter;
 
@@ -164,6 +167,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     // Battery stats.
     @Nullable
     private final IBatteryStats mBatteryStats;
+
+    // The lights service.
+    private final LightsManager mLights;
 
     // The sensor manager.
     private final SensorManager mSensorManager;
@@ -435,17 +441,14 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     // This should be false during system start up.
     private boolean mPendingRbcOnOrChanged = false;
 
+    // Whether auto brightness is applied one shot when screen is turned on
+    private boolean mAutoBrightnessOneShot;
+
     // Animators.
     private ObjectAnimator mColorFadeOnAnimator;
     private ObjectAnimator mColorFadeOffAnimator;
     private DualRampAnimator<DisplayPowerState> mScreenBrightnessRampAnimator;
     private BrightnessSetting.BrightnessSettingListener mBrightnessSettingListener;
-
-    // Screen-off animation
-    private int mScreenOffAnimation;
-    static final int SCREEN_OFF_FADE = 0;
-    static final int SCREEN_OFF_CRT = 1;
-    static final int SCREEN_OFF_SCALE = 2;
 
     // True if this DisplayPowerController has been stopped and should no longer be running.
     private boolean mStopped;
@@ -466,6 +469,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         mDisplayDevice = mLogicalDisplay.getPrimaryDisplayDeviceLocked();
         mUniqueDisplayId = logicalDisplay.getPrimaryDisplayDeviceLocked().getUniqueId();
         mHandler = new DisplayControllerHandler(handler.getLooper());
+        mLights = LocalServices.getService(LightsManager.class);
 
         if (mDisplayId == Display.DEFAULT_DISPLAY) {
             mBatteryStats = BatteryStatsService.getService();
@@ -479,6 +483,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         mWindowManagerPolicy = LocalServices.getService(WindowManagerPolicy.class);
         mBlanker = blanker;
         mContext = context;
+        mAutoBrightnessOneShot = getAutoBrightnessOneShotSetting();
         mBrightnessTracker = brightnessTracker;
         // TODO: b/186428377 update brightness setting when display changes
         mBrightnessSetting = brightnessSetting;
@@ -826,49 +831,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         }
     }
 
-    private int getScreenAnimationModeForDisplayState(int displayState) {
-        switch (mScreenOffAnimation) {
-            case SCREEN_OFF_FADE:
-                return ScreenStateAnimator.MODE_FADE;
-            case SCREEN_OFF_CRT:
-                if (displayState == Display.STATE_OFF) {
-                    return ScreenStateAnimator.MODE_COOL_DOWN;
-                } else {
-                    return USE_COLOR_FADE_ON_ANIMATION ? ScreenStateAnimator.MODE_WARM_UP
-                            : ScreenStateAnimator.MODE_FADE;
-                }
-            case SCREEN_OFF_SCALE:
-                if (displayState == Display.STATE_OFF) {
-                    return ScreenStateAnimator.MODE_SCALE_DOWN;
-                } else {
-                    return ScreenStateAnimator.MODE_FADE;
-                }
-            default:
-                return ScreenStateAnimator.MODE_FADE;
-        }
-    }
-
     private void initialize(int displayState) {
-        final ContentResolver cr = mContext.getContentResolver();
-        final ContentObserver observer = new ContentObserver(mHandler) {
-            @Override
-            public void onChange(boolean selfChange, Uri uri) {
-                mScreenOffAnimation = Settings.System.getIntForUser(cr,
-                        Settings.System.SCREEN_OFF_ANIMATION,
-                        SCREEN_OFF_FADE, UserHandle.USER_CURRENT);
-                if (mPowerState != null) {
-                    mPowerState.setScreenStateAnimator(mScreenOffAnimation);
-                }
-            }
-        };
-        cr.registerContentObserver(Settings.System.getUriFor(
-                Settings.System.SCREEN_OFF_ANIMATION),
-                false, observer, UserHandle.USER_ALL);
-        mScreenOffAnimation = Settings.System.getIntForUser(cr,
-                Settings.System.SCREEN_OFF_ANIMATION,
-                SCREEN_OFF_FADE, UserHandle.USER_CURRENT);
-
-        mPowerState = new DisplayPowerState(mBlanker, mScreenOffAnimation, mDisplayId, displayState);
+        mPowerState = new DisplayPowerState(mBlanker,
+                mColorFadeEnabled ? new ColorFade(mDisplayId) : null, mDisplayId, displayState);
 
         if (mColorFadeEnabled) {
             mColorFadeOnAnimator = ObjectAnimator.ofFloat(
@@ -906,6 +871,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 false /*notifyForDescendants*/, mSettingsObserver, UserHandle.USER_ALL);
         mContext.getContentResolver().registerContentObserver(
                 Settings.System.getUriFor(Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ),
+                false /*notifyForDescendants*/, mSettingsObserver, UserHandle.USER_ALL);
+        mContext.getContentResolver().registerContentObserver(
+                OuvrirSettings.System.getUriFor(OuvrirSettings.System.AUTO_BRIGHTNESS_ONE_SHOT),
                 false /*notifyForDescendants*/, mSettingsObserver, UserHandle.USER_ALL);
     }
 
@@ -1170,6 +1138,26 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (state == Display.STATE_OFF) {
             brightnessState = PowerManager.BRIGHTNESS_OFF_FLOAT;
             mBrightnessReasonTemp.setReason(BrightnessReason.REASON_SCREEN_OFF);
+            LogicalLight buttonsLight = mLights.getLight(LightsManager.LIGHT_ID_BUTTONS);
+            if (buttonsLight != null) {
+                buttonsLight.setBrightness(brightnessState);
+            }
+            LogicalLight keyboardLight = mLights.getLight(LightsManager.LIGHT_ID_KEYBOARD);
+            if (keyboardLight != null) {
+                keyboardLight.setBrightness(brightnessState);
+            }
+        }
+
+        // Disable button and keyboard lights when dozing
+        if (state == Display.STATE_DOZE || state == Display.STATE_DOZE_SUSPEND) {
+            LogicalLight buttonsLight = mLights.getLight(LightsManager.LIGHT_ID_BUTTONS);
+            if (buttonsLight != null) {
+                buttonsLight.setBrightness(PowerManager.BRIGHTNESS_OFF_FLOAT);
+            }
+            LogicalLight keyboardLight = mLights.getLight(LightsManager.LIGHT_ID_KEYBOARD);
+            if (keyboardLight != null) {
+                keyboardLight.setBrightness(PowerManager.BRIGHTNESS_OFF_FLOAT);
+            }
         }
 
         // Always use the VR brightness when in the VR state.
@@ -1247,7 +1235,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     mBrightnessConfiguration,
                     mLastUserSetScreenBrightness,
                     userSetBrightnessChanged, autoBrightnessAdjustment,
-                    autoBrightnessAdjustmentChanged, mPowerRequest.policy);
+                    autoBrightnessAdjustmentChanged, mPowerRequest.policy,
+                    mAutoBrightnessOneShot);
         }
 
         if (mBrightnessTracker != null) {
@@ -1758,9 +1747,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (mProximitySensor != null) {
             mProximityThreshold = Math.min(mProximitySensor.getMaximumRange(),
                     TYPICAL_PROXIMITY_THRESHOLD);
-            if (Float.isNaN(mProximityThreshold)) {
-                mProximityThreshold = 5.0f;
-            }
         }
     }
 
@@ -1814,7 +1800,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             // Skip the screen off animation and add a black surface to hide the
             // contents of the screen.
             mPowerState.prepareColorFade(mContext,
-                    getScreenAnimationModeForDisplayState(Display.STATE_ON));
+                    mColorFadeFadesConfig ? ColorFade.MODE_FADE : ColorFade.MODE_WARM_UP);
             if (mColorFadeOffAnimator != null) {
                 mColorFadeOffAnimator.end();
             }
@@ -1847,7 +1833,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 if (mPowerState.getColorFadeLevel() == 1.0f) {
                     mPowerState.dismissColorFade();
                 } else if (mPowerState.prepareColorFade(mContext,
-                        getScreenAnimationModeForDisplayState(Display.STATE_ON))) {
+                        mColorFadeFadesConfig ?
+                                ColorFade.MODE_FADE :
+                                        ColorFade.MODE_WARM_UP)) {
                     mColorFadeOnAnimator.start();
                 } else {
                     mColorFadeOnAnimator.end();
@@ -1949,7 +1937,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 mPowerState.dismissColorFadeResources();
             } else if (performScreenOffTransition
                     && mPowerState.prepareColorFade(mContext,
-                            getScreenAnimationModeForDisplayState(Display.STATE_OFF))) {
+                            mColorFadeFadesConfig ?
+                                    ColorFade.MODE_FADE : ColorFade.MODE_COOL_DOWN)
+                    && mPowerState.getScreenState() != Display.STATE_OFF) {
                 // Perform the screen off animation.
                 mColorFadeOffAnimator.start();
             } else {
@@ -2078,7 +2068,14 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         // We don't bother with a pending variable for VR screen brightness since we just
         // immediately adapt to it.
         mScreenBrightnessForVr = getScreenBrightnessForVrSetting();
+        mAutoBrightnessOneShot = getAutoBrightnessOneShotSetting();
         sendUpdatePowerState();
+    }
+
+    private boolean getAutoBrightnessOneShotSetting() {
+        return OuvrirSettings.System.getIntForUser(
+                mContext.getContentResolver(), OuvrirSettings.System.AUTO_BRIGHTNESS_ONE_SHOT,
+                0, UserHandle.USER_CURRENT) == 1;
     }
 
     private float getAutoBrightnessAdjustmentSetting() {

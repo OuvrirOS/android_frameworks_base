@@ -54,7 +54,6 @@ import com.android.systemui.statusbar.notification.stack.StackStateAnimator;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
-import com.android.systemui.statusbar.policy.SecureLockscreenQSDisabler;
 import com.android.systemui.util.LifecycleFragment;
 import com.android.systemui.util.Utils;
 
@@ -94,7 +93,6 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
     private float mLastPanelFraction;
     private float mSquishinessFraction = 1;
     private boolean mQsDisabled;
-    private int mQSPanelScrollY = 0;
 
     private final RemoteInputQuickSettingsDisabler mRemoteInputQuickSettingsDisabler;
     private final CommandQueue mCommandQueue;
@@ -104,7 +102,6 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
     private final QSFragmentComponent.Factory mQsComponentFactory;
     private final QSFragmentDisableFlagsLogger mQsFragmentDisableFlagsLogger;
     private final QSTileHost mHost;
-    private final SecureLockscreenQSDisabler mSecureLockscreenQSDisabler;
     private boolean mShowCollapsedOnKeyguard;
     private boolean mLastKeyguardAndExpanded;
     /**
@@ -155,8 +152,7 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
             KeyguardBypassController keyguardBypassController,
             QSFragmentComponent.Factory qsComponentFactory,
             QSFragmentDisableFlagsLogger qsFragmentDisableFlagsLogger,
-            FalsingManager falsingManager, DumpManager dumpManager,
-            SecureLockscreenQSDisabler secureLockscreenQSDisabler) {
+            FalsingManager falsingManager, DumpManager dumpManager) {
         mRemoteInputQuickSettingsDisabler = remoteInputQsDisabler;
         mCommandQueue = commandQueue;
         mQsDetailDisplayer = qsDetailDisplayer;
@@ -170,7 +166,6 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
         mBypassController = keyguardBypassController;
         mStatusBarStateController = statusBarStateController;
         mDumpManager = dumpManager;
-        mSecureLockscreenQSDisabler = secureLockscreenQSDisabler;
     }
 
     @Override
@@ -198,7 +193,6 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
         mQSPanelScrollView.setOnScrollChangeListener(
                 (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
                     // Lazily update animators whenever the scrolling changes
-                    mQSPanelScrollY = scrollY;
                     mQSAnimator.requestAnimatorUpdate();
                     mHeader.setExpandedScrollAmount(scrollY);
                     if (mScrollListener != null) {
@@ -318,7 +312,6 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
             }
         }
         updateQsState();
-        mHeader.setExpandedScrollAmount(Math.max(mQSPanelScrollY, mQSPanelScrollView.getScrollY()));
     }
 
     @Override
@@ -368,7 +361,6 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
         }
         int state2BeforeAdjustment = state2;
         state2 = mRemoteInputQuickSettingsDisabler.adjustDisableFlags(state2);
-        state2 = mSecureLockscreenQSDisabler.adjustDisableFlags(state2);
 
         mQsFragmentDisableFlagsLogger.logDisableFlagChange(
                 /* new= */ new DisableState(state1, state2BeforeAdjustment),
@@ -453,7 +445,7 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
     public void setExpanded(boolean expanded) {
         if (DEBUG) Log.d(TAG, "setExpanded " + expanded);
         mQsExpanded = expanded;
-        mQSPanelController.setListening(mListening, mQsExpanded || mInSplitShade);
+        mQSPanelController.setListening(mListening, mQsExpanded);
         updateQsState();
     }
 
@@ -482,7 +474,7 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
         mListening = listening;
         mQSContainerImplController.setListening(listening);
         mFooter.setListening(listening);
-        mQSPanelController.setListening(mListening, mQsExpanded || mInSplitShade);
+        mQSPanelController.setListening(mListening, mQsExpanded);
     }
 
     @Override

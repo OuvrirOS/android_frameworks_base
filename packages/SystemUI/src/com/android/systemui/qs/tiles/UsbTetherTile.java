@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 The Android Open Source Project
- * Copyright (C) 2017-2018 The LineageOS Project
+ * Copyright (C) 2017-2018 The OuvrirOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,42 +17,36 @@
 
 package com.android.systemui.qs.tiles;
 
+import static com.android.internal.logging.MetricsLogger.VIEW_UNKNOWN;
+
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbManager;
-import android.net.TetheringManager;
-import android.net.TetheringManager.TetheringRequest;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
-import android.net.ConnectivityManager;
+import android.net.TetheringManager;
 import android.service.quicksettings.Tile;
 import android.view.View;
-import android.util.Log;
 
 import androidx.annotation.Nullable;
 
-import com.android.internal.util.ConcurrentUtils;
 import com.android.internal.logging.MetricsLogger;
-import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
-
-import com.android.systemui.plugins.qs.QSTile.BooleanState;
-import com.android.systemui.qs.QSHost;
-import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
+import com.android.systemui.plugins.qs.QSTile.BooleanState;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.logging.QSLogger;
+import com.android.systemui.qs.tileimpl.QSTileImpl;
 
 import javax.inject.Inject;
-
-import dagger.Lazy;
 
 /**
  * USB Tether quick settings tile
@@ -61,15 +55,13 @@ public class UsbTetherTile extends QSTileImpl<BooleanState> {
 
     private final Icon mIcon = ResourceIcon.get(R.drawable.ic_qs_usb_tether);
 
-    private final String TAG = "UsbTetherTile";
-
     private static final Intent TETHER_SETTINGS = new Intent().setComponent(new ComponentName(
             "com.android.settings", "com.android.settings.TetherSettings"));
 
     private final TetheringManager mTetheringManager;
 
     private boolean mListening;
-    private Handler mMainHandler;;
+
     private boolean mUsbConnected = false;
     private boolean mUsbTetherEnabled = false;
 
@@ -86,7 +78,6 @@ public class UsbTetherTile extends QSTileImpl<BooleanState> {
     ) {
         super(host, backgroundLooper, mainHandler, falsingManager, metricsLogger,
                 statusBarStateController, activityStarter, qsLogger);
-        mMainHandler = mainHandler;
         mTetheringManager = mContext.getSystemService(TetheringManager.class);
     }
 
@@ -111,23 +102,8 @@ public class UsbTetherTile extends QSTileImpl<BooleanState> {
 
     @Override
     protected void handleClick(@Nullable View view) {
-        if (!mUsbConnected) {
-            return;
-        }
-
-        if (!mUsbTetherEnabled) {
-            Log.d(TAG, "Starting Usb tethering");
-            mTetheringManager.startTethering(new TetheringRequest.Builder(
-                    TetheringManager.TETHERING_USB).setShouldShowEntitlementUi(false).build(),
-                    ConcurrentUtils.DIRECT_EXECUTOR,
-                    new TetheringManager.StartTetheringCallback() {
-                        @Override
-                        public void onTetheringFailed(final int result) {
-                            Log.e(TAG, "onTetheringFailed");
-                        }
-                    });
-        } else {
-            mTetheringManager.stopTethering(TetheringManager.TETHERING_USB);
+        if (mUsbConnected) {
+            mTetheringManager.setUsbTethering(!mUsbTetherEnabled);
         }
     }
 
@@ -165,6 +141,6 @@ public class UsbTetherTile extends QSTileImpl<BooleanState> {
 
     @Override
     public int getMetricsCategory() {
-        return MetricsEvent.CUSTOM_TILES;
+        return VIEW_UNKNOWN;
     }
 }

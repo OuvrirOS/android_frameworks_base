@@ -127,7 +127,7 @@ import java.lang.reflect.InvocationTargetException;
 public final class BluetoothAdapter {
     private static final String TAG = "BluetoothAdapter";
     private static final String DESCRIPTOR = "android.bluetooth.BluetoothAdapter";
-    private static final boolean DBG = false;
+    private static final boolean DBG = true;
     private static final boolean VDBG = false;
 
     /**
@@ -1057,10 +1057,7 @@ public final class BluetoothAdapter {
                 @SuppressLint("AndroidFrameworkRequiresPermission")
                 protected Integer recompute(Void query) {
                     try {
-                        if (mService != null) {
-                            return mService.getState();
-                        }
-                        return BluetoothAdapter.STATE_OFF;
+                        return mService.getState();
                     } catch (RemoteException e) {
                         throw e.rethrowFromSystemServer();
                     }
@@ -2025,6 +2022,7 @@ public final class BluetoothAdapter {
         }
         return false;
     }
+
     /**
      * Connects all enabled and supported bluetooth profiles between the local and remote device.
      * Connection is asynchronous and you should listen to each profile's broadcast intent
@@ -3280,7 +3278,6 @@ public final class BluetoothAdapter {
             case BluetoothProfile.LE_AUDIO:
                 BluetoothLeAudio leAudio = (BluetoothLeAudio) proxy;
                 leAudio.close();
-                break;
             case BluetoothProfile.GROUP_CLIENT:
                 BluetoothDeviceGroup groupClient = (BluetoothDeviceGroup) proxy;
                 groupClient.close();
@@ -3325,6 +3322,7 @@ public final class BluetoothAdapter {
         }
         return true;
     }
+
     private void closeBroadcastProfile(BluetoothProfile proxy) {
         Class<?> broadcastClass = null;
         Method broadcastClose = null;
@@ -3348,6 +3346,7 @@ public final class BluetoothAdapter {
             }
         }
     }
+
     private static final IBluetoothManagerCallback sManagerCallback =
             new IBluetoothManagerCallback.Stub() {
                 public void onBluetoothServiceUp(IBluetooth bluetoothService) {

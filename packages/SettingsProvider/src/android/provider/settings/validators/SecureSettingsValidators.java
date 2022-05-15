@@ -18,13 +18,11 @@ package android.provider.settings.validators;
 
 import static android.provider.settings.validators.SettingsValidators.ACCESSIBILITY_SHORTCUT_TARGET_LIST_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.ANY_INTEGER_VALIDATOR;
-import static android.provider.settings.validators.SettingsValidators.ANY_FLOAT_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.BOOLEAN_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.COLON_SEPARATED_COMPONENT_LIST_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.COLON_SEPARATED_PACKAGE_LIST_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.COMMA_SEPARATED_COMPONENT_LIST_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.COMPONENT_NAME_VALIDATOR;
-import static android.provider.settings.validators.SettingsValidators.HEX_COLOR_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.JSON_OBJECT_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.LOCALE_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.NONE_NEGATIVE_LONG_VALIDATOR;
@@ -155,28 +153,6 @@ public class SecureSettingsValidators {
         VALIDATORS.put(Secure.LOCKSCREEN_USE_DOUBLE_LINE_CLOCK, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.DOZE_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.DOZE_ALWAYS_ON, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.DOZE_ALWAYS_ON_AUTO_MODE, new DiscreteValueValidator(new String[] {"0", "1", "2", "3", "4"}));
-        VALIDATORS.put(Secure.DOZE_ALWAYS_ON_AUTO_TIME, new Validator() {
-                @Override
-                public boolean validate(String value) {
-                    String[] values = value.split(",", 0);
-                    if (values.length != 2) return false;
-                    for (String str : values) {
-                        String[] time = str.split(":", 0);
-                        if (time.length != 2) return false;
-                        int hour, minute;
-                        try {
-                            hour = Integer.valueOf(time[0]);
-                            minute = Integer.valueOf(time[1]);
-                        } catch (NumberFormatException e) {
-                            return false;
-                        }
-                        if (hour < 0 || hour > 23 || minute < 0 || minute > 59)
-                            return false;
-                    }
-                    return true;
-                }
-        });
         VALIDATORS.put(Secure.DOZE_PICK_UP_GESTURE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.DOZE_DOUBLE_TAP_GESTURE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.DOZE_TAP_SCREEN_GESTURE, BOOLEAN_VALIDATOR);
@@ -341,17 +317,6 @@ public class SecureSettingsValidators {
             }
             return true;
         });
-        VALIDATORS.put(Secure.DISABLE_SECURE_TILES_ON_LOCKSCREEN, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.VOLUME_LINK_NOTIFICATION, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.GESTURE_NAVBAR_LENGTH_MODE, new InclusiveIntegerRangeValidator(0, 2));
-        VALIDATORS.put(Secure.FACE_UNLOCK_METHOD, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.ENABLE_LOCATION_PRIVACY_INDICATOR, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.SECURE_LOCKSCREEN_QS_DISABLED, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.MONET_ENGINE_ACCURATE_SHADES, new InclusiveIntegerRangeValidator(0, 1));
-        VALIDATORS.put(Secure.MONET_ENGINE_COLOR_OVERRIDE, HEX_COLOR_VALIDATOR);
-        VALIDATORS.put(Secure.MONET_ENGINE_CUSTOM_COLOR, HEX_COLOR_VALIDATOR);
-        VALIDATORS.put(Secure.MONET_ENGINE_CHROMA_FACTOR, ANY_FLOAT_VALIDATOR);
-        VALIDATORS.put(Secure.MONET_ENGINE_LINEAR_LIGHTNESS, new InclusiveIntegerRangeValidator(0, 1));
-        VALIDATORS.put(Secure.MONET_ENGINE_WHITE_LUMINANCE, new InclusiveIntegerRangeValidator(0, 1000));
     }
 }

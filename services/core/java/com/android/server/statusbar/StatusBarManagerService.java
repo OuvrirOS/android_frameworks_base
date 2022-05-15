@@ -482,13 +482,13 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         @Override
-        public boolean showShutdownUi(boolean isReboot, String reason, boolean advancedReboot) {
+        public boolean showShutdownUi(boolean isReboot, String reason, boolean rebootCustom) {
             if (!mContext.getResources().getBoolean(R.bool.config_showSysuiShutdown)) {
                 return false;
             }
             if (mBar != null) {
                 try {
-                    mBar.showShutdownUi(isReboot, reason, advancedReboot);
+                    mBar.showShutdownUi(isReboot, reason, rebootCustom);
                     return true;
                 } catch (RemoteException ex) {}
             }
@@ -618,16 +618,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                 } catch (RemoteException ex) { }
             }
         }
-
-        @Override
-        public void leftInLandscapeChanged(boolean isLeft) {
-            if (mBar != null) {
-                try {
-                    mBar.leftInLandscapeChanged(isLeft);
-                } catch (RemoteException ex) {
-                }
-            }
-        }
     };
 
     private final GlobalActionsProvider mGlobalActionsProvider = new GlobalActionsProvider() {
@@ -715,72 +705,12 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     }
 
     @Override
-    public void toggleSettingsPanel() {
-        enforceExpandStatusBar();
-
-        if (mBar != null) {
-            try {
-                mBar.toggleSettingsPanel();
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
     public void expandSettingsPanel(String subPanel) {
         enforceExpandStatusBar();
 
         if (mBar != null) {
             try {
                 mBar.animateExpandSettingsPanel(subPanel);
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
-    public void toggleRecentApps() {
-        enforceStatusBarService();
-
-        if (mBar != null) {
-            try {
-                mBar.toggleRecentApps();
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
-    public void toggleSplitScreen() {
-        enforceStatusBarService();
-
-        if (mBar != null) {
-            try {
-                mBar.toggleSplitScreen();
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
-    public void preloadRecentApps() {
-        enforceStatusBarService();
-
-        if (mBar != null) {
-            try {
-                mBar.preloadRecentApps();
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
-    public void cancelPreloadRecentApps() {
-        enforceStatusBarService();
-
-        if (mBar != null) {
-            try {
-                mBar.cancelPreloadRecentApps();
             } catch (RemoteException ex) {
             }
         }
@@ -925,16 +855,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     }
 
     @Override
-    public void killForegroundApp() {
-        if (mBar != null) {
-            try {
-                mBar.killForegroundApp();
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
     public void startTracing() {
         if (mBar != null) {
             try {
@@ -958,27 +878,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     @Override
     public boolean isTracing() {
         return mTracingEnabled;
-    }
-
-    @Override
-    public void toggleCameraFlash() {
-        if (mBar != null) {
-            try {
-                mBar.toggleCameraFlash();
-            } catch (RemoteException ex) {
-            }
-        }
-    }
-
-    @Override
-    public void setBlockedGesturalNavigation(boolean blocked) {
-        if (mBar != null) {
-            try {
-                mBar.setBlockedGesturalNavigation(blocked);
-            } catch (RemoteException ex) {
-                // do nothing
-            }
-        }
     }
 
     // TODO(b/117478341): make it aware of multi-display if needed.
@@ -1171,23 +1070,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                             isMultiClientImeEnabled);
                 } catch (RemoteException ex) { }
             });
-        }
-    }
-
-    /**
-     * Let systemui know screen pinning state change. This is independent of the
-     * showScreenPinningRequest() call as it does not reflect state
-     *
-     * @hide
-     */
-    @Override
-    public void screenPinningStateChanged(boolean enabled) {
-        enforceStatusBar();
-        if (mBar != null) {
-            try {
-                mBar.screenPinningStateChanged(enabled);
-            } catch (RemoteException ex) {
-            }
         }
     }
 
@@ -1449,11 +1331,8 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
      * Allows the status bar to reboot the device.
      */
     @Override
-    public void reboot(boolean safeMode) {
+    public void reboot(boolean safeMode, String reason) {
         enforceStatusBarService();
-        String reason = safeMode
-                ? PowerManager.REBOOT_SAFE_MODE
-                : PowerManager.SHUTDOWN_USER_REQUESTED;
         ShutdownCheckPoints.recordCheckPoint(Binder.getCallingPid(), reason);
         final long identity = Binder.clearCallingIdentity();
         try {
@@ -1463,26 +1342,8 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                 if (safeMode) {
                     ShutdownThread.rebootSafeMode(getUiContext(), true);
                 } else {
-                    ShutdownThread.reboot(getUiContext(), reason, false);
+                    ShutdownThread.rebootCustom(getUiContext(), reason, false);
                 }
-            });
-        } finally {
-            Binder.restoreCallingIdentity(identity);
-        }
-    }
-
-    /**
-     * Allows the status bar to reboot the device to recovery or bootloader.
-     */
-    @Override
-    public void advancedReboot(String mode) {
-        enforceStatusBarService();
-        long identity = Binder.clearCallingIdentity();
-        try {
-            mHandler.post(() -> {
-                // ShutdownThread displays UI, so give it a UI context.
-                    ShutdownThread.reboot(getUiContext(),
-                            mode, false/*don't ask for confirmation*/);
             });
         } finally {
             Binder.restoreCallingIdentity(identity);

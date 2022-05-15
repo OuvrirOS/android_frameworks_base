@@ -31,12 +31,10 @@ import android.annotation.ColorInt;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.database.ContentObserver;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
@@ -44,9 +42,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.Rect;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -432,7 +428,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private int mCornerRadius;
     private int mMinimumPaddings;
     private int mQsTilePadding;
-    private int mQsTileColumns;
     private boolean mSkinnyNotifsInLandscape;
     private int mSidePaddings;
     private final Rect mBackgroundAnimationRect = new Rect();
@@ -568,34 +563,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         }
     };
 
-    private CustomSettingsObserver mCustomSettingsObserver = new CustomSettingsObserver(new Handler());
-    private class CustomSettingsObserver extends ContentObserver {
-        CustomSettingsObserver(Handler handler) {
-            super(handler);
-        }
-
-        void observe() {
-            mContext.getContentResolver().registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.NOTIFICATION_HEADERS),
-                    false, this, UserHandle.USER_ALL);
-        }
-
-        void stop() {
-            mContext.getContentResolver().unregisterContentObserver(this);
-        }
-
-        @Override
-        public void onChange(boolean selfChange, Uri uri) {
-            update();
-        }
-
-        void update() {
-            boolean enabled = Settings.System.getIntForUser(getContext().getContentResolver(),
-                    Settings.System.NOTIFICATION_HEADERS, 1, UserHandle.USER_CURRENT) == 1;
-            mSectionsManager.setHeadersVisibility(enabled);
-        }
-    }
-
     @Nullable
     private OnClickListener mManageButtonClickListener;
 
@@ -606,11 +573,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mUnlockedScreenOffAnimationController =
                 Dependency.get(UnlockedScreenOffAnimationController.class);
         updateSplitNotificationShade();
-
-        boolean showHeaders = Settings.System.getIntForUser(getContext().getContentResolver(),
-                Settings.System.NOTIFICATION_HEADERS, 1, UserHandle.USER_CURRENT) == 1;
-
-        mSectionsManager.initialize(this, LayoutInflater.from(context), showHeaders);
+        mSectionsManager.initialize(this, LayoutInflater.from(context));
         mSections = mSectionsManager.createSectionsForBuckets();
 
         mAmbientState = Dependency.get(AmbientState.class);
@@ -736,34 +699,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)
     boolean hasActiveClearableNotifications(@SelectedRows int selection) {
         return mController.hasActiveClearableNotifications(selection);
-    }
-
-    /** @hide */
-    public ExpandableNotificationRow getFirstActiveClearableNotifications(@SelectedRows int selection) {
-        int childCount = getChildCount();
-        for (int i = 0; i < childCount; i++) {
-            View child = getChildAt(i);
-            if (!(child instanceof ExpandableNotificationRow)) {
-                continue;
-            }
-            final ExpandableNotificationRow row = (ExpandableNotificationRow) child;
-            if (row.getEntry().isClearable() && matchesSelection(row, selection)) {
-                return row;
-            }
-        }
-        return null;
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        mCustomSettingsObserver.observe();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        mCustomSettingsObserver.stop();
     }
 
     @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)
@@ -1026,7 +961,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mBottomMargin = res.getDimensionPixelSize(R.dimen.notification_panel_margin_bottom);
         mMinimumPaddings = res.getDimensionPixelSize(R.dimen.notification_side_paddings);
         mQsTilePadding = res.getDimensionPixelOffset(R.dimen.qs_tile_margin_horizontal);
-        mQsTileColumns = res.getInteger(R.integer.quick_settings_num_columns);
         mSkinnyNotifsInLandscape = res.getBoolean(R.bool.config_skinnyNotifsInLandscape);
         mSidePaddings = mMinimumPaddings;  // Updated in onMeasure by updateSidePadding()
         mMinInteractionHeight = res.getDimensionPixelSize(
@@ -1048,7 +982,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             return;
         }
         final int innerWidth = viewWidth - mMinimumPaddings * 2;
-        final int qsTileWidth = (innerWidth - mQsTilePadding * (mQsTileColumns - 1)) / mQsTileColumns;
+        final int qsTileWidth = (innerWidth - mQsTilePadding * 3) / 4;
         mSidePaddings = mMinimumPaddings + qsTileWidth + mQsTilePadding;
     }
 

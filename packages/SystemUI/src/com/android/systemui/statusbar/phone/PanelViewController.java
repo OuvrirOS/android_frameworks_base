@@ -185,8 +185,6 @@ public abstract class PanelViewController {
     private final PanelExpansionStateManager mPanelExpansionStateManager;
     private final TouchHandler mTouchHandler;
 
-    protected boolean mIsSbDoubleTapEnabled;
-
     protected abstract void onExpandingFinished();
 
     protected void onExpandingStarted() {
@@ -1309,7 +1307,7 @@ public abstract class PanelViewController {
                         onTrackingStarted();
                     }
                     if (isFullyCollapsed() && !mHeadsUpManager.hasPinnedHeadsUp()
-                            && !mStatusBar.isBouncerShowing() && !mIsSbDoubleTapEnabled) {
+                            && !mStatusBar.isBouncerShowing()) {
                         startOpening(event);
                     }
                     break;

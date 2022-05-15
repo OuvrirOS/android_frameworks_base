@@ -186,15 +186,13 @@ public class NotificationViewHierarchyManager implements DynamicPrivacyControlle
                     || !mLockscreenUserManager.needsSeparateWorkChallenge(userId))) {
                 userPublic = false;
             }
-            final boolean hideContents = ent.getSbn().getIsContentSecure();
-            boolean needsRedaction = hideContents || mLockscreenUserManager.needsRedaction(ent);
+            boolean needsRedaction = mLockscreenUserManager.needsRedaction(ent);
             boolean sensitive = userPublic && needsRedaction;
             boolean deviceSensitive = devicePublic
                     && !mLockscreenUserManager.userAllowsPrivateNotificationsInPublic(
                     currentUserId);
-            ent.setSensitive(sensitive, hideContents || deviceSensitive);
+            ent.setSensitive(sensitive, deviceSensitive);
             ent.getRow().setNeedsRedaction(needsRedaction);
-            ent.getRow().setForceHideContents(hideContents);
             mLowPriorityInflationHelper.recheckLowPriorityViewAndInflate(ent, ent.getRow());
             boolean isChildInGroup = mGroupManager.isChildInGroup(ent);
 

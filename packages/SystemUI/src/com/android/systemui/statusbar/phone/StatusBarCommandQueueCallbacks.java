@@ -64,11 +64,9 @@ import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.phone.dagger.StatusBarComponent;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
-import com.android.systemui.statusbar.policy.FlashlightController;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
-import com.android.systemui.statusbar.policy.SecureLockscreenQSDisabler;
 import com.android.wm.shell.legacysplitscreen.LegacySplitScreen;
 
 import java.util.Optional;
@@ -82,7 +80,6 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
     private final Context mContext;
     private final ShadeController mShadeController;
     private final CommandQueue mCommandQueue;
-    private final FlashlightController mFlashlightController;
     private final NotificationPanelViewController mNotificationPanelViewController;
     private final Optional<LegacySplitScreen> mSplitScreenOptional;
     private final RemoteInputQuickSettingsDisabler mRemoteInputQuickSettingsDisabler;
@@ -107,7 +104,6 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
     private final int mDisplayId;
     private final boolean mVibrateOnOpening;
     private final VibrationEffect mCameraLaunchGestureVibrationEffect;
-    private final SecureLockscreenQSDisabler mSecureLockscreenQSDisabler;
 
 
     private static final AudioAttributes VIBRATION_ATTRIBUTES = new AudioAttributes.Builder()
@@ -122,7 +118,6 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
             @Main Resources resources,
             ShadeController shadeController,
             CommandQueue commandQueue,
-            FlashlightController flashlightController,
             NotificationPanelViewController notificationPanelViewController,
             Optional<LegacySplitScreen> splitScreenOptional,
             RemoteInputQuickSettingsDisabler remoteInputQuickSettingsDisabler,
@@ -144,14 +139,12 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
             Optional<Vibrator> vibratorOptional,
             LightBarController lightBarController,
             DisableFlagsLogger disableFlagsLogger,
-            @DisplayId int displayId,
-            SecureLockscreenQSDisabler secureLockscreenQSDisabler) {
+            @DisplayId int displayId) {
 
         mStatusBar = statusBar;
         mContext = context;
         mShadeController = shadeController;
         mCommandQueue = commandQueue;
-        mFlashlightController = flashlightController;
         mNotificationPanelViewController = notificationPanelViewController;
         mSplitScreenOptional = splitScreenOptional;
         mRemoteInputQuickSettingsDisabler = remoteInputQuickSettingsDisabler;
@@ -174,7 +167,6 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
         mLightBarController = lightBarController;
         mDisableFlagsLogger = disableFlagsLogger;
         mDisplayId = displayId;
-        mSecureLockscreenQSDisabler = secureLockscreenQSDisabler;
 
         mVibrateOnOpening = resources.getBoolean(R.bool.config_vibrateOnIconAnimation);
         mCameraLaunchGestureVibrationEffect = getCameraGestureVibrationEffect(
@@ -285,7 +277,6 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
 
         int state2BeforeAdjustment = state2;
         state2 = mRemoteInputQuickSettingsDisabler.adjustDisableFlags(state2);
-        state2 = mSecureLockscreenQSDisabler.adjustDisableFlags(state2);
         Log.d(StatusBar.TAG,
                 mDisableFlagsLogger.getDisableFlagsString(
                         /* old= */ new DisableFlagsLogger.DisableState(
@@ -388,6 +379,7 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
             mPowerManager.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_CAMERA_LAUNCH,
                     "com.android.systemui:CAMERA_GESTURE");
         }
+
         if (source != StatusBarManager.CAMERA_LAUNCH_SOURCE_SCREEN_GESTURE) {
             vibrateForCameraGesture();
         }
@@ -647,12 +639,5 @@ public class StatusBarCommandQueueCallbacks implements CommandQueue.Callbacks {
             timings[i] = pattern[i];
         }
         return VibrationEffect.createWaveform(timings, /* repeat= */ -1);
-    }
-
-    @Override
-    public void toggleCameraFlash() {
-        if (mFlashlightController.isAvailable()) {
-            mFlashlightController.setFlashlight(!mFlashlightController.isEnabled());
-        }
     }
 }

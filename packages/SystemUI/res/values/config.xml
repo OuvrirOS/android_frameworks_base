@@ -58,20 +58,23 @@
          prevent wasting cpu cycles on the dimming animation -->
     <bool name="config_navigation_bar_enable_auto_dim_no_visible_wallpaper">true</bool>
 
+    <!-- The maximum number of tiles in the QuickQSPanel -->
+    <integer name="quick_qs_panel_max_tiles">4</integer>
+
     <!-- The maximum number of rows in the QuickQSPanel -->
-    <integer name="quick_qs_panel_max_rows">1</integer>
+    <integer name="quick_qs_panel_max_rows">2</integer>
 
     <!-- The number of columns in the QuickSettings -->
     <integer name="quick_settings_num_columns">2</integer>
 
     <!-- The number of rows in the QuickSettings -->
-    <integer name="quick_settings_max_rows">3</integer>
+    <integer name="quick_settings_max_rows">4</integer>
 
     <!-- The number of columns that the top level tiles span in the QuickSettings -->
 
     <!-- The default tiles to display in QuickSettings -->
     <string name="quick_settings_tiles_default" translatable="false">
-        internet,bt,flashlight,dnd,alarm,airplane,nfc,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle
+        internet,bt,flashlight,dnd,alarm,airplane,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle
     </string>
 
     <!-- The minimum number of tiles to display in QuickSettings -->
@@ -79,7 +82,7 @@
 
     <!-- Tiles native to System UI. Order should match "quick_settings_tiles_default" -->
     <string name="quick_settings_tiles_stock" translatable="false">
-        internet,bt,flashlight,dnd,alarm,airplane,nfc,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,location,hotspot,inversion,saver,dark,work,night,reverse,reduce_brightness,powershare,caffeine,ambient_display,usb_tether,sync,sound,screenshot,heads_up,gamingmode,reboot,onthego,volume_panel,aod,dataswitch,fpsinfo,compass,cpuinfo
+        internet,wifi,cell,bt,flashlight,dnd,alarm,airplane,nfc,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,location,hotspot,inversion,saver,dark,work,night,reverse,reduce_brightness,ambient_display,aod,caffeine,heads_up,reading_mode,sync,powershare,profiles,usb_tether
     </string>
 
     <!-- The tiles to display in QuickSettings -->
@@ -230,7 +233,7 @@
     <item name="proximity_sensor_secondary_threshold_latch" translatable="false" format="float" type="dimen"></item>
 
     <!-- Doze: pulse parameter - how long does it take to fade in? -->
-    <integer name="doze_pulse_duration_in">100</integer>
+    <integer name="doze_pulse_duration_in">130</integer>
 
     <!-- Doze: pulse parameter - once faded in, how long does it stay visible? -->
     <integer name="doze_pulse_duration_visible">6000</integer>
@@ -287,7 +290,7 @@
     <bool name="config_keyguard_user_switch_opens_qs_details">false</bool>
 
     <!-- SystemUIFactory component -->
-    <string name="config_systemUIFactoryComponent" translatable="false">com.dot.systemui.CustomSystemUIFactory</string>
+    <string name="config_systemUIFactoryComponent" translatable="false">com.android.systemui.SystemUIFactory</string>
 
     <!-- SystemUI Services: The classes of the stuff to start. -->
     <string-array name="config_systemUIServiceComponents" translatable="false">
@@ -321,7 +324,7 @@
     <dimen name="config_qsTileStrokeWidthInactive">-1dp</dimen>
 
     <!-- SystemUI vender service, used in config_systemUIServiceComponents. -->
-    <!--string name="config_systemUIVendorServiceComponent" translatable="false">com.android.systemui.VendorServices</string-->
+    <string name="config_systemUIVendorServiceComponent" translatable="false">com.android.systemui.VendorServices</string>
 
     <!-- SystemUI Services (per user): The classes of the stuff to start for each user. This is a subset of the config_systemUIServiceComponents -->
     <string-array name="config_systemUIServiceComponentsPerUser" translatable="false">
@@ -609,9 +612,6 @@
 
     <!-- Whether to use window background blur for the volume dialog. -->
     <bool name="config_volumeDialogUseBackgroundBlur">false</bool>
-    
-    <!-- Whether or not to show the ripple animation when unlocking the device using fringerprint. -->
-    <bool name="config_show_fp_ripple">true</bool>
 
     <!-- The properties of the face auth camera in pixels -->
     <integer-array name="config_face_auth_props">
@@ -664,4 +664,17 @@
     <!-- Flag to enable privacy dot views, it shall be true for normal case -->
     <bool name="config_enablePrivacyDot">true</bool>
 
+    <!-- Icons that don't show in a collapsed non-keyguard statusbar -->
+    <string-array name="config_collapsed_statusbar_icon_blocklist" translatable="false">
+        <item>@*android:string/status_bar_volume</item>
+        <item>@*android:string/status_bar_alarm_clock</item>
+        <item>@*android:string/status_bar_call_strength</item>
+    </string-array>
+
+    <!-- Icons that don't show in a collapsed statusbar on keyguard -->
+    <string-array name="config_keyguard_statusbar_icon_blocklist" translatable="false">
+        <item>@*android:string/status_bar_volume</item>
+        <item>@*android:string/status_bar_alarm_clock</item>
+        <item>@*android:string/status_bar_call_strength</item>
+    </string-array>
 </resources>

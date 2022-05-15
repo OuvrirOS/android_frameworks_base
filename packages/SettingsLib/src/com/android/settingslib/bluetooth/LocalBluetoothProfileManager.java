@@ -38,6 +38,7 @@ import android.bluetooth.BluetoothVcp;
 import android.content.Context;
 import android.content.Intent;
 import android.os.ParcelUuid;
+import android.os.SystemProperties;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
@@ -114,6 +115,7 @@ public class LocalBluetoothProfileManager {
 
     private static final String BC_CONNECTION_STATE_CHANGED =
             "android.bluetooth.bc.profile.action.CONNECTION_STATE_CHANGED";
+
     /**
      * Mapping from profile name, e.g. "HEADSET" to profile object.
      */
@@ -328,11 +330,6 @@ public class LocalBluetoothProfileManager {
         }
 
         public void onReceive(Context context, Intent intent, BluetoothDevice device) {
-            if (device == null) {
-                if(DEBUG) Log.d(TAG, "StateChangedHandler receives state-change for invalid device");
-                return;
-            }
-
             CachedBluetoothDevice cachedDevice = mDeviceManager.findDevice(device);
             if (cachedDevice == null) {
                 Log.w(TAG, "StateChangedHandler found new device: " + device);

@@ -718,6 +718,9 @@ class DatabaseHelper extends SQLiteOpenHelper {
                    Secure.LOCK_PATTERN_ENABLED,
                    Secure.LOCK_PATTERN_VISIBLE,
                    Secure.LOCK_PATTERN_TACTILE_FEEDBACK_ENABLED,
+                   Secure.LOCK_PATTERN_SIZE,
+                   Secure.LOCK_DOTS_VISIBLE,
+                   Secure.LOCK_SHOW_ERROR_PATH,
                    "lockscreen.password_type",
                    "lockscreen.lockoutattemptdeadline",
                    "lockscreen.patterneverchosen",
@@ -1965,10 +1968,11 @@ class DatabaseHelper extends SQLiteOpenHelper {
                 // Convert lock pattern
                 try {
                     LockPatternUtils lpu = new LockPatternUtils(mContext);
+                    byte size = lpu.getLockPatternSize(mUserHandle);
                     List<LockPatternView.Cell> cellPattern =
-                            LockPatternUtils.byteArrayToPattern(lockPattern.getBytes());
+                            LockPatternUtils.byteArrayToPattern(lockPattern.getBytes(), size);
                     lpu.setLockCredential(
-                            LockscreenCredential.createPattern(cellPattern),
+                            LockscreenCredential.createPattern(cellPattern, size),
                             LockscreenCredential.createNone(),
                             UserHandle.USER_SYSTEM);
                 } catch (IllegalArgumentException e) {
@@ -2386,9 +2390,6 @@ class DatabaseHelper extends SQLiteOpenHelper {
             loadBooleanSetting(stmt, Settings.Secure.WAKE_GESTURE_ENABLED,
                     R.bool.def_wake_gesture_enabled);
 
-            loadIntegerSetting(stmt, Settings.Secure.VOLUME_PANEL_ON_LEFT,
-                    R.bool.def_volume_panel_on_left);
-
             loadIntegerSetting(stmt, Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS,
                     R.integer.def_lock_screen_show_notifications);
 
@@ -2665,8 +2666,7 @@ class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     private String getDefaultDeviceName() {
-        return mContext.getResources().getString(R.string.def_device_name_simple,
-            SystemProperties.get("ro.product.marketname", Build.MODEL));
+        return mContext.getResources().getString(R.string.def_device_name_simple, Build.MODEL);
     }
 
     private TelephonyManager getTelephonyManager() {

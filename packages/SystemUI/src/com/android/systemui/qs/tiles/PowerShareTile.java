@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The LineageOS Project
+ * Copyright (C) 2020 The OuvrirOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.statusbar.policy.BatteryController;
 
-import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import org.ouvriros.internal.logging.OuvrirMetricsLogger;
 
 import vendor.ouvrir.powershare.V1_0.IPowerShare;
 
@@ -208,7 +208,7 @@ public class PowerShareTile extends QSTileImpl<BooleanState>
 
     @Override
     public int getMetricsCategory() {
-        return MetricsEvent.CUSTOM_TILES;
+        return OuvrirMetricsLogger.TILE_POWERSHARE;
     }
 
     @Override

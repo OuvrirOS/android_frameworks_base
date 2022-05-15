@@ -133,7 +133,7 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
     }
 
     @Override
-    public synchronized void addCallback(@NonNull Callback callback) {
+    public void addCallback(@NonNull Callback callback) {
         Objects.requireNonNull(callback, "Callback must not be null. b/128895449");
         if (!mCallbacks.contains(callback)) {
             mCallbacks.add(callback);
@@ -141,7 +141,7 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
     }
 
     @Override
-    public synchronized void removeCallback(@NonNull Callback callback) {
+    public void removeCallback(@NonNull Callback callback) {
         Objects.requireNonNull(callback, "Callback must not be null. b/128895449");
         mCallbacks.remove(callback);
     }
@@ -254,7 +254,8 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
 
     @Override
     public boolean isKeyguardScreenRotationAllowed() {
-        return false;
+        return SystemProperties.getBoolean("lockscreen.rot_override", false)
+                || mContext.getResources().getBoolean(R.bool.config_enableLockScreenRotation);
     }
 
     @Override

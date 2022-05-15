@@ -30,7 +30,6 @@ import com.android.settingslib.Utils
 import com.android.settingslib.drawable.UserIconDrawable
 import com.android.systemui.R
 import com.android.systemui.statusbar.phone.MultiUserSwitch
-import com.android.systemui.statusbar.phone.RunningServicesButton
 import com.android.systemui.statusbar.phone.SettingsButton
 
 /**
@@ -45,18 +44,11 @@ class FooterActionsView(context: Context?, attrs: AttributeSet?) : LinearLayout(
     private lateinit var multiUserAvatar: ImageView
     private lateinit var tunerIcon: View
     private lateinit var editTilesButton: View
-    private lateinit var runningServicesButton: RunningServicesButton
 
     private var settingsCogAnimator: TouchAnimator? = null
 
     private var qsDisabled = false
     private var expansionAmount = 0f
-
-    private var mMultiUserEnabled = true
-    private var mShowSettingsIcon = true
-    private var mShowServicesIcon = false
-    private var mShowEditIcon = true
-    private var mShowUserIcon = true
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -66,15 +58,11 @@ class FooterActionsView(context: Context?, attrs: AttributeSet?) : LinearLayout(
         multiUserSwitch = findViewById(R.id.multi_user_switch)
         multiUserAvatar = multiUserSwitch.findViewById(R.id.multi_user_avatar)
         tunerIcon = requireViewById(R.id.tuner_icon)
-        runningServicesButton = findViewById(R.id.running_services_button)
 
         // RenderThread is doing more harm than good when touching the header (to expand quick
         // settings), so disable it for this view
         if (settingsButton.background is RippleDrawable) {
             (settingsButton.background as RippleDrawable).setForceSoftware(true)
-        }
-        if (runningServicesButton.background is RippleDrawable) {
-            (runningServicesButton.background as RippleDrawable).setForceSoftware(true)
         }
         updateResources()
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -126,8 +114,7 @@ class FooterActionsView(context: Context?, attrs: AttributeSet?) : LinearLayout(
         val disabled = state2 and StatusBarManager.DISABLE2_QUICK_SETTINGS != 0
         if (disabled == qsDisabled) return
         qsDisabled = disabled
-        mMultiUserEnabled = multiUserEnabled
-        updateEverything(isTunerEnabled, mMultiUserEnabled)
+        updateEverything(isTunerEnabled, multiUserEnabled)
     }
 
     fun updateEverything(
@@ -135,8 +122,7 @@ class FooterActionsView(context: Context?, attrs: AttributeSet?) : LinearLayout(
         multiUserEnabled: Boolean
     ) {
         post {
-            mMultiUserEnabled = multiUserEnabled
-            updateVisibilities(isTunerEnabled, mMultiUserEnabled)
+            updateVisibilities(isTunerEnabled, multiUserEnabled)
             updateClickabilities()
             isClickable = false
         }
@@ -146,19 +132,17 @@ class FooterActionsView(context: Context?, attrs: AttributeSet?) : LinearLayout(
         multiUserSwitch.isClickable = multiUserSwitch.visibility == VISIBLE
         editTilesButton.isClickable = editTilesButton.visibility == VISIBLE
         settingsButton.isClickable = settingsButton.visibility == VISIBLE
-        runningServicesButton.isClickable = runningServicesButton.visibility == VISIBLE
     }
 
     private fun updateVisibilities(
         isTunerEnabled: Boolean,
         multiUserEnabled: Boolean
     ) {
-        settingsContainer.visibility = if (qsDisabled || !mShowSettingsIcon) GONE else VISIBLE
-        multiUserSwitch.visibility = if (mShowUserIcon && multiUserEnabled) VISIBLE else GONE
+        settingsContainer.visibility = if (qsDisabled) GONE else VISIBLE
+        tunerIcon.visibility = if (isTunerEnabled) VISIBLE else INVISIBLE
+        multiUserSwitch.visibility = if (multiUserEnabled) VISIBLE else GONE
         val isDemo = UserManager.isDeviceInDemoMode(context)
-        editTilesButton.visibility = if (isDemo || !mShowEditIcon) GONE else VISIBLE
-        settingsButton.visibility = if (isDemo || !mShowSettingsIcon) GONE else VISIBLE
-        runningServicesButton.visibility = if (isDemo || !mShowServicesIcon) GONE else VISIBLE
+        settingsButton.visibility = if (isDemo) INVISIBLE else VISIBLE
     }
 
     fun onUserInfoChanged(picture: Drawable?, isGuestUser: Boolean) {
@@ -170,33 +154,5 @@ class FooterActionsView(context: Context?, attrs: AttributeSet?) : LinearLayout(
                     PorterDuff.Mode.SRC_IN)
         }
         multiUserAvatar.setImageDrawable(pictureToSet)
-    }
-
-    public fun updateSettingsIconVisibility(
-        visible: Boolean
-    ) {
-        mShowSettingsIcon = visible
-        updateEverything(false, mMultiUserEnabled)
-    }
-
-    public fun updateServicesIconVisibility(
-        visible: Boolean
-    ) {
-        mShowServicesIcon = visible
-        updateEverything(false, mMultiUserEnabled)
-    }
-
-    public fun updateEditIconVisibility(
-        visible: Boolean
-    ) {
-        mShowEditIcon = visible
-        updateEverything(false, mMultiUserEnabled)
-    }
-
-    public fun updateUserIconVisibility(
-        visible: Boolean
-    ) {
-        mShowUserIcon = visible
-        updateEverything(false, mMultiUserEnabled)
     }
 }

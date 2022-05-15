@@ -68,8 +68,6 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.graphics.Rect;
@@ -288,13 +286,8 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
 
         public void shutdown(boolean confirm);
         public void reboot(boolean confirm);
+        public void reboot(boolean confirm, String reason);
         public void rebootSafeMode(boolean confirm);
-
-        /** @hide */
-        void reboot(String reason, boolean confirm);
-
-        /** @hide */
-        void advancedReboot(String reason, boolean confirm);
 
         /**
          * Return the window manager lock needed to correctly call "Lw" methods.
@@ -736,13 +729,6 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
             int icon, int logo, int windowFlags, Configuration overrideConfig, int displayId);
 
     /**
-     * Set or clear a window which can behave as the keyguard.
-     *
-     * @param win The window which can behave as the keyguard.
-     */
-    void setKeyguardCandidateLw(@Nullable WindowState win);
-
-    /**
      * Create and return an animation to re-display a window that was force hidden by Keyguard.
      */
     public Animation createHiddenByKeyguardExit(boolean onWallpaper,
@@ -1118,11 +1104,6 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
      * Specifies whether there is an on-screen navigation bar separate from the status bar.
      */
     public boolean hasNavigationBar();
-
-    /**
-     * Send some ActionHandler commands to WindowManager.
-     */
-    public void sendCustomAction(Intent intent);
 
     /**
      * Lock the device now.

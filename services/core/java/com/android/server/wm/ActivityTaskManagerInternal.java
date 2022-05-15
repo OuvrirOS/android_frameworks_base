@@ -686,6 +686,4 @@ public abstract class ActivityTaskManagerInternal {
     public abstract void registerActivityStartInterceptor(
             @ActivityInterceptorCallback.OrderedId int id,
             ActivityInterceptorCallback callback);
-
-    public abstract boolean isVisibleActivity(IBinder activityToken);
 }

@@ -326,7 +326,7 @@
 
     <!-- The height of the quick settings footer that holds the user switcher, settings icon,
          etc. -->
-    <dimen name="qs_footer_height">72dp</dimen>
+    <dimen name="qs_footer_height">96dp</dimen>
 
     <!-- The size of each of the icon buttons in the QS footer -->
     <dimen name="qs_footer_action_button_size">48dp</dimen>
@@ -443,8 +443,8 @@
     <dimen name="pull_span_min">25dp</dimen>
 
     <dimen name="qs_corner_radius">28dp</dimen>
-    <dimen name="qs_tile_height">100dp</dimen>
-    <dimen name="qs_tile_margin_horizontal">22dp</dimen>
+    <dimen name="qs_tile_height">84dp</dimen>
+    <dimen name="qs_tile_margin_horizontal">8dp</dimen>
     <dimen name="qs_tile_margin_vertical">@dimen/qs_tile_margin_horizontal</dimen>
     <dimen name="qs_tile_margin_top_bottom">4dp</dimen>
     <dimen name="qs_brightness_margin_top">8dp</dimen>
@@ -455,12 +455,12 @@
          (Toolbar_minWidth (56dp) + qs_tile_margin_top_bottom (4dp))
     -->
     <dimen name="qs_customize_header_min_height">68dp</dimen>
-    <dimen name="qs_customize_internal_side_paddings">6dp</dimen>
+    <dimen name="qs_customize_internal_side_paddings">8dp</dimen>
     <dimen name="qs_icon_size">20dp</dimen>
     <dimen name="qs_side_view_size">28dp</dimen>
-    <dimen name="qs_label_container_margin">6dp</dimen>
-    <dimen name="qs_quick_tile_size">55dp</dimen>
-    <dimen name="qs_tile_padding">18dp</dimen>
+    <dimen name="qs_label_container_margin">10dp</dimen>
+    <dimen name="qs_quick_tile_size">60dp</dimen>
+    <dimen name="qs_tile_padding">12dp</dimen>
     <dimen name="qs_tile_start_padding">16dp</dimen>
     <dimen name="qs_drawable_end_margin">4dp</dimen>
     <dimen name="qs_page_indicator_width">16dp</dimen>
@@ -469,7 +469,7 @@
          Scaled @dimen/qs_page_indicator-width by .4f.
     -->
     <dimen name="qs_page_indicator_dot_width">6.4dp</dimen>
-    <dimen name="qs_tile_text_size">12sp</dimen>
+    <dimen name="qs_tile_text_size">14sp</dimen>
     <dimen name="qs_panel_padding">16dp</dimen>
     <dimen name="qs_dual_tile_padding_horizontal">6dp</dimen>
     <dimen name="qs_panel_padding_bottom">0dp</dimen>
@@ -806,9 +806,9 @@
     <dimen name="global_actions_controls_y_translation">20dp</dimen>
 
     <!-- Shutdown and restart actions are larger in power options dialog -->
-    <dimen name="global_actions_power_dialog_item_height">108dp</dimen>
-    <dimen name="global_actions_power_dialog_item_width">165dp</dimen>
-    <dimen name="global_actions_power_dialog_item_bottom_margin">14dp</dimen>
+    <dimen name="global_actions_power_dialog_item_height">128dp</dimen>
+    <dimen name="global_actions_power_dialog_item_width">128dp</dimen>
+    <dimen name="global_actions_power_dialog_item_bottom_margin">22dp</dimen>
 
     <!-- Power Menu Lite -->
     <dimen name="global_actions_button_size">96dp</dimen>
@@ -918,7 +918,7 @@
 
     <!--  Blur radius on status bar window and power menu  -->
     <dimen name="min_window_blur_radius">1px</dimen>
-    <dimen name="max_window_blur_radius">75px</dimen>
+    <dimen name="max_window_blur_radius">23px</dimen>
 
     <!-- How much into a DisplayCutout's bounds we can go, on each side -->
     <dimen name="display_cutout_margin_consumption">0px</dimen>
@@ -937,9 +937,9 @@
     <dimen name="ongoing_appops_chip_min_width">56dp</dimen>
     <!--  Three privacy items. This value must not be exceeded  -->
     <dimen name="ongoing_appops_chip_max_width">76dp</dimen>
-    <dimen name="ongoing_appops_dot_diameter">5dp</dimen>
+    <dimen name="ongoing_appops_dot_diameter">6dp</dimen>
     <!--  Total minimum padding to enforce to ensure that the dot can always show  -->
-    <dimen name="ongoing_appops_dot_min_padding">15dp</dimen>
+    <dimen name="ongoing_appops_dot_min_padding">20dp</dimen>
 
     <dimen name="ongoing_appops_dialog_side_margins">@dimen/notification_shade_content_margin_horizontal</dimen>
 

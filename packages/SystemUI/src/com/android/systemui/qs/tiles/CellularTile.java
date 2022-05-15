@@ -62,12 +62,11 @@ import com.android.systemui.statusbar.connectivity.MobileDataIndicators;
 import com.android.systemui.statusbar.connectivity.NetworkController;
 import com.android.systemui.statusbar.connectivity.SignalCallback;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
-import com.android.systemui.statusbar.policy.KeyguardStateController;
 
 import javax.inject.Inject;
 
 /** Quick settings tile: Cellular **/
-public class CellularTile extends SecureQSTile<SignalState> {
+public class CellularTile extends QSTileImpl<SignalState> {
     private static final String ENABLE_SETTINGS_DATA_PLAN = "enable.settings.data.plan";
 
     private final NetworkController mController;
@@ -86,11 +85,10 @@ public class CellularTile extends SecureQSTile<SignalState> {
             StatusBarStateController statusBarStateController,
             ActivityStarter activityStarter,
             QSLogger qsLogger,
-            NetworkController networkController,
-            KeyguardStateController keyguardStateController
+            NetworkController networkController
     ) {
         super(host, backgroundLooper, mainHandler, falsingManager, metricsLogger,
-                statusBarStateController, activityStarter, qsLogger, keyguardStateController);
+                statusBarStateController, activityStarter, qsLogger);
         mController = networkController;
         mDataController = mController.getMobileDataController();
         mDetailAdapter = new CellularDetailAdapter();
@@ -117,15 +115,11 @@ public class CellularTile extends SecureQSTile<SignalState> {
         if (getState().state == Tile.STATE_UNAVAILABLE) {
             return new Intent(Settings.ACTION_WIRELESS_SETTINGS);
         }
-        return new Intent(Settings.Panel.ACTION_MOBILE_DATA);
+        return getCellularSettingIntent();
     }
 
     @Override
-    protected void handleClick(@Nullable View view, boolean keyguardShowing) {
-        if (checkKeyguard(view, keyguardShowing)) {
-            return;
-        }
-
+    protected void handleClick(@Nullable View view) {
         if (getState().state == Tile.STATE_UNAVAILABLE) {
             return;
         }
@@ -187,8 +181,8 @@ public class CellularTile extends SecureQSTile<SignalState> {
             cb = mSignalCallback.mInfo;
         }
 
-        DataUsageController.DataUsageInfo carrierLabelInfo = mDataController.getDataUsageInfo();
         final Resources r = mContext.getResources();
+        state.label = r.getString(R.string.mobile_data);
         boolean mobileDataEnabled = mDataController.isMobileDataSupported()
                 && mDataController.isMobileDataEnabled();
         state.value = mobileDataEnabled;
@@ -196,14 +190,8 @@ public class CellularTile extends SecureQSTile<SignalState> {
         state.activityOut = mobileDataEnabled && cb.activityOut;
         state.expandedAccessibilityClassName = Switch.class.getName();
         if (cb.noSim) {
-            state.label = r.getString(R.string.mobile_data);
             state.icon = ResourceIcon.get(R.drawable.ic_qs_no_sim);
         } else {
-            if (carrierLabelInfo != null) {
-                state.label = carrierLabelInfo.carrier;
-            } else {
-                state.label = r.getString(R.string.mobile_data);
-            }
             state.icon = ResourceIcon.get(R.drawable.ic_swap_vert);
         }
 

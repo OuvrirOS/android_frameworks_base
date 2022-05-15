@@ -19,16 +19,17 @@ package com.android.systemui.statusbar.phone;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 
 import android.app.StatusBarManager;
+import android.content.Context;
 import android.graphics.RectF;
 import android.hardware.display.AmbientDisplayConfiguration;
 import android.media.AudioManager;
 import android.media.session.MediaSessionLegacyHelper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.GestureDetector;
-import android.widget.ImageView;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -59,6 +60,8 @@ import com.android.systemui.statusbar.phone.panelstate.PanelExpansionStateManage
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.tuner.TunerService;
+
+import ouvriros.providers.OuvrirSettings;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -110,17 +113,19 @@ public class NotificationShadeWindowViewController {
     private final NotificationPanelViewController mNotificationPanelViewController;
     private final PanelExpansionStateManager mPanelExpansionStateManager;
     private final StatusBarWindowController mStatusBarWindowController;
-
-    private ImageView mAutoBrightnessIcon;
-    private boolean mShowAutoBrightnessButton;
+    private final PowerManager mPowerManager;
 
     // Used for determining view / touch intersection
     private int[] mTempLocation = new int[2];
     private RectF mTempRect = new RectF();
     private boolean mIsTrackingBarGesture = false;
 
-    private static final String QS_SHOW_AUTO_BRIGHTNESS =
-            Settings.Secure.QS_SHOW_AUTO_BRIGHTNESS;
+    private static final String DOUBLE_TAP_SLEEP_GESTURE =
+            "ouvrirsystem:" + OuvrirSettings.System.DOUBLE_TAP_SLEEP_GESTURE;
+    private boolean mDoubleTapToSleepEnabled;
+    private int mQuickQsOffsetHeight;
+
+    private boolean mDoubleTapEnabledNative;
 
     @Inject
     public NotificationShadeWindowViewController(
@@ -148,7 +153,8 @@ public class NotificationShadeWindowViewController {
             StatusBarWindowController statusBarWindowController,
             NotificationStackScrollLayoutController notificationStackScrollLayoutController,
             StatusBarKeyguardViewManager statusBarKeyguardViewManager,
-            LockIconViewController lockIconViewController) {
+            LockIconViewController lockIconViewController,
+            Context context) {
         mCoordinator = coordinator;
         mPulseExpansionHandler = pulseExpansionHandler;
         mDynamicPrivacyController = dynamicPrivacyController;
@@ -174,11 +180,10 @@ public class NotificationShadeWindowViewController {
         mNotificationStackScrollLayoutController = notificationStackScrollLayoutController;
         mStatusBarKeyguardViewManager = statusBarKeyguardViewManager;
         mLockIconViewController = lockIconViewController;
+        mPowerManager = context.getSystemService(PowerManager.class);
 
         // This view is not part of the newly inflated expanded status bar.
         mBrightnessMirror = mView.findViewById(R.id.brightness_mirror_container);
-        mAutoBrightnessIcon = (ImageView)
-                mBrightnessMirror.findViewById(R.id.brightness_icon);
     }
 
     /**
@@ -196,27 +201,28 @@ public class NotificationShadeWindowViewController {
             AmbientDisplayConfiguration configuration =
                     new AmbientDisplayConfiguration(mView.getContext());
             switch (key) {
+                case Settings.Secure.DOUBLE_TAP_TO_WAKE:
+                    mDoubleTapEnabledNative = TunerService.parseIntegerSwitch(newValue, false);
+                    break;
                 case Settings.Secure.DOZE_DOUBLE_TAP_GESTURE:
-                    mDoubleTapEnabled = Settings.Secure.getIntForUser(mView.getContext().getContentResolver(),
-                            Settings.Secure.DOZE_DOUBLE_TAP_GESTURE, 1, UserHandle.USER_CURRENT) == 1;
+                    mDoubleTapEnabled = configuration.doubleTapGestureEnabled(
+                            UserHandle.USER_CURRENT);
                     break;
                 case Settings.Secure.DOZE_TAP_SCREEN_GESTURE:
                     mSingleTapEnabled = configuration.tapGestureEnabled(UserHandle.USER_CURRENT);
                     break;
-                case QS_SHOW_AUTO_BRIGHTNESS:
-                    mShowAutoBrightnessButton =
-                            TunerService.parseIntegerSwitch(newValue, true);
-                    if (mAutoBrightnessIcon != null) {
-                        mAutoBrightnessIcon.setVisibility(
-                                mShowAutoBrightnessButton ? View.VISIBLE : View.GONE);
-                    }
+                case DOUBLE_TAP_SLEEP_GESTURE:
+                    mDoubleTapToSleepEnabled = TunerService.parseIntegerSwitch(newValue, true);
                     break;
             }
         };
         mTunerService.addTunable(tunable,
+                Settings.Secure.DOUBLE_TAP_TO_WAKE,
                 Settings.Secure.DOZE_DOUBLE_TAP_GESTURE,
                 Settings.Secure.DOZE_TAP_SCREEN_GESTURE,
-                QS_SHOW_AUTO_BRIGHTNESS);
+                DOUBLE_TAP_SLEEP_GESTURE);
+        mQuickQsOffsetHeight = mView.getResources().getDimensionPixelSize(
+                com.android.internal.R.dimen.quick_qs_offset_height);
 
         GestureDetector.SimpleOnGestureListener gestureListener =
                 new GestureDetector.SimpleOnGestureListener() {
@@ -232,7 +238,12 @@ public class NotificationShadeWindowViewController {
 
                     @Override
                     public boolean onDoubleTap(MotionEvent e) {
-                        if (mDoubleTapEnabled || mSingleTapEnabled) {
+                        if (!mStatusBarStateController.isDozing() && mDoubleTapToSleepEnabled
+                                && e.getY() < mQuickQsOffsetHeight) {
+                            mPowerManager.goToSleep(e.getEventTime());
+                            return true;
+                        }
+                        if (mDoubleTapEnabled || mSingleTapEnabled || mDoubleTapEnabledNative) {
                             mService.wakeUpIfDozing(
                                     SystemClock.uptimeMillis(), mView, "DOUBLE_TAP");
                             return true;
@@ -460,10 +471,6 @@ public class NotificationShadeWindowViewController {
             public void onChildViewAdded(View parent, View child) {
                 if (child.getId() == R.id.brightness_mirror_container) {
                     mBrightnessMirror = child;
-                    mAutoBrightnessIcon = (ImageView)
-                            child.findViewById(R.id.brightness_icon);
-                    mAutoBrightnessIcon.setVisibility(mShowAutoBrightnessButton
-                            ? View.VISIBLE : View.GONE);
                 }
             }
 
@@ -549,27 +556,4 @@ public class NotificationShadeWindowViewController {
                 mTempLocation[1] + view.getHeight());
         return mTempRect.contains(x, y);
     }
-
-    public void setDoubleTapToSleepGesture() {
-        boolean isDoubleTapLockscreenEnabled = Settings.System.getIntForUser(mView.getContext().getContentResolver(),
-                Settings.System.DOUBLE_TAP_SLEEP_LOCKSCREEN, 0, UserHandle.USER_CURRENT) == 1;
-        boolean isDoubleTapSbEnabled = Settings.System.getIntForUser(mView.getContext().getContentResolver(),
-                Settings.System.DOUBLE_TAP_SLEEP_GESTURE, 0, UserHandle.USER_CURRENT) == 1;
-        if (mNotificationPanelViewController != null) {
-            mNotificationPanelViewController.setLockscreenDoubleTapToSleep(isDoubleTapLockscreenEnabled);
-            mNotificationPanelViewController.setSbDoubleTapToSleep(isDoubleTapSbEnabled);
-        }
-        if (mDragDownHelper != null) {
-            mDragDownHelper.updateDoubleTapToSleep(isDoubleTapSbEnabled);
-        }
-    }
-
-    public void setStatusBarWindowViewOptions() {
-        int isQsQuickPulldown = Settings.System.getIntForUser(mView.getContext().getContentResolver(),
-                Settings.System.STATUS_BAR_QUICK_QS_PULLDOWN, 0, UserHandle.USER_CURRENT);
-        if (mNotificationPanelViewController != null) {
-            mNotificationPanelViewController.setQsQuickPulldown(isQsQuickPulldown);
-        }
-    }
-
 }

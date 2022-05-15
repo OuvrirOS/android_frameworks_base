@@ -33,12 +33,11 @@ import com.android.systemui.navigationbar.buttons.ButtonInterface;
 
 public class NavigationHandle extends View implements ButtonInterface {
 
-    private final Paint mPaint = new Paint();
+    protected final Paint mPaint = new Paint();
     private @ColorInt final int mLightColor;
     private @ColorInt final int mDarkColor;
-    private int mVerticalShift;
-    private final int mRadius;
-    private final int mBottom;
+    protected final int mRadius;
+    protected final int mBottom;
     private boolean mRequiresInvalidate;
 
     public NavigationHandle(Context context) {
@@ -78,7 +77,7 @@ public class NavigationHandle extends View implements ButtonInterface {
         int navHeight = getHeight();
         int height = mRadius * 2;
         int width = getWidth();
-        int y = (navHeight - mBottom - height + mVerticalShift);
+        int y = (navHeight - mBottom - height);
         canvas.drawRoundRect(0, y, width, y + height, mRadius, mRadius, mPaint);
     }
 
@@ -110,10 +109,5 @@ public class NavigationHandle extends View implements ButtonInterface {
 
     @Override
     public void setDelayTouchFeedback(boolean shouldDelay) {
-    }
-
-    public void shiftHandle(int verticalShift) {
-        mVerticalShift = verticalShift;
-        invalidate();
     }
 }

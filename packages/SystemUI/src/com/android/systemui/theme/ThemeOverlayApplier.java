@@ -101,12 +101,6 @@ public class ThemeOverlayApplier implements Dumpable {
     @VisibleForTesting
     static final String OVERLAY_CATEGORY_ICON_THEME_PICKER =
             "android.theme.customization.icon_pack.themepicker";
-    @VisibleForTesting
-    static final String OVERLAY_CATEGORY_ICON_SIGNAL =
-            "android.theme.customization.signal_icon";
-    @VisibleForTesting
-    static final String OVERLAY_CATEGORY_ICON_WIFI =
-            "android.theme.customization.wifi_icon";
 
     /*
      * All theme customization categories used by the system, in order that they should be applied,
@@ -121,9 +115,7 @@ public class ThemeOverlayApplier implements Dumpable {
             OVERLAY_CATEGORY_ICON_ANDROID,
             OVERLAY_CATEGORY_ICON_SYSUI,
             OVERLAY_CATEGORY_ICON_SETTINGS,
-            OVERLAY_CATEGORY_ICON_THEME_PICKER,
-            OVERLAY_CATEGORY_ICON_SIGNAL,
-            OVERLAY_CATEGORY_ICON_WIFI);
+            OVERLAY_CATEGORY_ICON_THEME_PICKER);
 
     /* Categories that need to be applied to the current user as well as the system user. */
     @VisibleForTesting
@@ -144,8 +136,6 @@ public class ThemeOverlayApplier implements Dumpable {
     private final Executor mMainExecutor;
     private final String mLauncherPackage;
     private final String mThemePickerPackage;
-
-    private boolean mIsBlackTheme;
 
     public ThemeOverlayApplier(OverlayManager overlayManager,
             Executor bgExecutor,
@@ -176,8 +166,6 @@ public class ThemeOverlayApplier implements Dumpable {
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SETTINGS, SETTINGS_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_LAUNCHER, mLauncherPackage);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_THEME_PICKER, mThemePickerPackage);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SIGNAL, SYSUI_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_WIFI, SYSUI_PACKAGE);
 
         dumpManager.registerDumpable(TAG, this);
     }
@@ -216,12 +204,8 @@ public class ThemeOverlayApplier implements Dumpable {
             HashSet<OverlayIdentifier> identifiersPending = new HashSet<>();
             if (pendingCreation != null) {
                 for (FabricatedOverlay overlay : pendingCreation) {
-                    try {
-                        identifiersPending.add(overlay.getIdentifier());
-                        transaction.registerFabricatedOverlay(overlay);
-                    } catch (NullPointerException e) {
-                        Log.e(TAG, "NPE for overlay.getIdentifier()", e);
-                    }
+                    identifiersPending.add(overlay.getIdentifier());
+                    transaction.registerFabricatedOverlay(overlay);
                 }
             }
 
@@ -247,21 +231,6 @@ public class ThemeOverlayApplier implements Dumpable {
         });
     }
 
-    public void setIsBlackTheme(boolean black) {
-        mIsBlackTheme = black;
-    }
-
-    public void applyBlackTheme(boolean enable) {
-        mBgExecutor.execute(() -> {
-            try {
-                mOverlayManager.setEnabled("com.android.system.theme.black",
-                        enable, UserHandle.SYSTEM);
-            } catch (SecurityException | IllegalStateException e) {
-                Log.e(TAG, "setEnabled failed", e);
-            }
-        });
-    }
-
     @VisibleForTesting
     protected OverlayManagerTransaction.Builder getTransactionBuilder() {
         return new OverlayManagerTransaction.Builder();
@@ -274,10 +243,6 @@ public class ThemeOverlayApplier implements Dumpable {
         if (DEBUG) {
             Log.d(TAG, "setEnabled: " + identifier.getPackageName() + " category: "
                     + category + ": " + enabled);
-        }
-
-        if (OVERLAY_CATEGORY_SYSTEM_PALETTE.equals(category)) {
-            enabled = enabled && !mIsBlackTheme;
         }
 
         OverlayInfo overlayInfo = mOverlayManager.getOverlayInfo(identifier,

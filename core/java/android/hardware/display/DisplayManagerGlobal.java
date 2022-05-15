@@ -311,7 +311,7 @@ public final class DisplayManagerGlobal {
                 mDisplayListeners.add(new DisplayListenerDelegate(listener, looper, eventsMask));
                 registerCallbackIfNeededLocked();
             } else {
-                mDisplayListeners.get(index).setEventsMaskLocked(eventsMask);
+                mDisplayListeners.get(index).setEventsMask(eventsMask);
             }
             updateCallbackIfNeededLocked();
         }
@@ -961,12 +961,12 @@ public final class DisplayManagerGlobal {
             removeCallbacksAndMessages(null);
         }
 
-        public void setEventsMaskLocked(@EventsMask long newEventsMask) {
+        public synchronized void setEventsMask(@EventsMask long newEventsMask) {
             mEventsMask = newEventsMask;
         }
 
         @Override
-        public void handleMessage(Message msg) {
+        public synchronized void handleMessage(Message msg) {
             switch (msg.what) {
                 case EVENT_DISPLAY_ADDED:
                     if ((mEventsMask & DisplayManager.EVENT_FLAG_DISPLAY_ADDED) != 0) {

@@ -22,6 +22,7 @@
 #include <android/hardware/power/Boost.h>
 #include <android/hardware/power/IPower.h>
 #include <android/hardware/power/Mode.h>
+#include <android/keycodes.h>
 #include <android/system/suspend/1.0/ISystemSuspend.h>
 #include <android/system/suspend/ISuspendControlService.h>
 #include <android/system/suspend/internal/ISuspendControlServiceInternal.h>
@@ -45,7 +46,6 @@
 #include <utils/misc.h>
 #include <utils/String8.h>
 #include <utils/Log.h>
-#include <android/keycodes.h>
 
 #include "com_android_server_power_PowerManagerService.h"
 

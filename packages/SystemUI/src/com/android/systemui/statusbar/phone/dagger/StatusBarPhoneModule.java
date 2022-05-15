@@ -105,13 +105,10 @@ import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragmentL
 import com.android.systemui.statusbar.phone.ongoingcall.OngoingCallController;
 import com.android.systemui.statusbar.phone.panelstate.PanelExpansionStateManager;
 import com.android.systemui.statusbar.policy.BatteryController;
-import com.android.systemui.statusbar.policy.BurnInProtectionController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.ExtensionController;
-import com.android.systemui.statusbar.policy.FlashlightController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
-import com.android.systemui.statusbar.policy.TaskHelper;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
@@ -209,7 +206,6 @@ public interface StatusBarPhoneModule {
             PluginManager pluginManager,
             Optional<LegacySplitScreen> splitScreenOptional,
             LightsOutNotifController lightsOutNotifController,
-            FlashlightController flashlightController,
             StatusBarNotificationActivityStarter.Builder
                     statusBarNotificationActivityStarterBuilder,
             ShadeController shadeController,
@@ -229,6 +225,7 @@ public interface StatusBarPhoneModule {
             StatusBarTouchableRegionManager statusBarTouchableRegionManager,
             NotificationIconAreaController notificationIconAreaController,
             BrightnessSliderController.Factory brightnessSliderFactory,
+            WiredChargingRippleController chargingRippleAnimationController,
             WallpaperController wallpaperController,
             OngoingCallController ongoingCallController,
             SystemStatusAnimationScheduler animationScheduler,
@@ -246,10 +243,7 @@ public interface StatusBarPhoneModule {
             Optional<StartingSurface> startingSurfaceOptional,
             TunerService tunerService,
             DumpManager dumpManager,
-            ActivityLaunchAnimator activityLaunchAnimator,
-            BurnInProtectionController burnInProtectionController,
-            WiredChargingRippleController wiredChargingRippleController,
-            TaskHelper taskHelper) {
+            ActivityLaunchAnimator activityLaunchAnimator) {
         return new StatusBar(
                 context,
                 notificationsController,
@@ -315,7 +309,6 @@ public interface StatusBarPhoneModule {
                 pluginManager,
                 splitScreenOptional,
                 lightsOutNotifController,
-                flashlightController,
                 statusBarNotificationActivityStarterBuilder,
                 shadeController,
                 statusBarKeyguardViewManager,
@@ -334,6 +327,7 @@ public interface StatusBarPhoneModule {
                 statusBarTouchableRegionManager,
                 notificationIconAreaController,
                 brightnessSliderFactory,
+                chargingRippleAnimationController,
                 wallpaperController,
                 ongoingCallController,
                 animationScheduler,
@@ -351,10 +345,7 @@ public interface StatusBarPhoneModule {
                 startingSurfaceOptional,
                 tunerService,
                 dumpManager,
-                activityLaunchAnimator,
-                burnInProtectionController,
-                wiredChargingRippleController,
-                taskHelper
+                activityLaunchAnimator
         );
     }
 }

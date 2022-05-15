@@ -149,12 +149,6 @@ public class CommandQueue extends IStatusBar.Stub implements
     private static final int MSG_EMERGENCY_ACTION_LAUNCH_GESTURE      = 58 << MSG_SHIFT;
     private static final int MSG_SET_NAVIGATION_BAR_LUMA_SAMPLING_ENABLED = 59 << MSG_SHIFT;
     private static final int MSG_SET_UDFPS_HBM_LISTENER = 60 << MSG_SHIFT;
-    private static final int MSG_TOGGLE_CAMERA_FLASH  = 61 << MSG_SHIFT;
-    private static final int MSG_SET_BLOCKED_GESTURAL_NAVIGATION   = 62 << MSG_SHIFT;
-    private static final int MSG_KILL_FOREGROUND_APP               = 63 << MSG_SHIFT;
-    private static final int MSG_TOGGLE_SETTINGS_PANEL             = 64 << MSG_SHIFT;
-    private static final int MSG_SCREEN_PINNING_STATE_CHANGED      = 65 << MSG_SHIFT;
-    private static final int MSG_LEFT_IN_LANDSCAPE_STATE_CHANGED   = 66 << MSG_SHIFT;
 
     public static final int FLAG_EXCLUDE_NONE = 0;
     public static final int FLAG_EXCLUDE_SEARCH_PANEL = 1 << 0;
@@ -199,7 +193,6 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void animateExpandNotificationsPanel() { }
         default void animateCollapsePanels(int flags, boolean force) { }
         default void togglePanel() { }
-        default void toggleSettingsPanel() { }
         default void animateExpandSettingsPanel(String obj) { }
 
         /**
@@ -290,7 +283,7 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void showPinningEnterExitToast(boolean entering) { }
         default void showPinningEscapeToast() { }
         default void handleShowGlobalActionsMenu() { }
-        default void handleShowShutdownUi(boolean isReboot, String reason, boolean advancedReboot) { }
+        default void handleShowShutdownUi(boolean isReboot, String reason, boolean rebootCustom) { }
 
         default void showWirelessChargingAnimation(int batteryLevel) {  }
 
@@ -418,16 +411,6 @@ public class CommandQueue extends IStatusBar.Stub implements
          * @see IStatusBar#setNavigationBarLumaSamplingEnabled(int, boolean)
          */
         default void setNavigationBarLumaSamplingEnabled(int displayId, boolean enable) {}
-
-        default void toggleCameraFlash() { }
-
-        default void setBlockedGesturalNavigation(boolean blocked) {}
-
-        default void killForegroundApp() { }
-
-        default void screenPinningStateChanged(boolean enabled) {}
-
-        default void leftInLandscapeChanged(boolean isLeft) {}
     }
 
     public CommandQueue(Context context) {
@@ -593,13 +576,6 @@ public class CommandQueue extends IStatusBar.Stub implements
         synchronized (mLock) {
             mHandler.removeMessages(MSG_TOGGLE_PANEL);
             mHandler.obtainMessage(MSG_TOGGLE_PANEL, 0, 0).sendToTarget();
-        }
-    }
-
-    public void toggleSettingsPanel() {
-        synchronized (mLock) {
-            mHandler.removeMessages(MSG_TOGGLE_SETTINGS_PANEL);
-            mHandler.obtainMessage(MSG_TOGGLE_SETTINGS_PANEL, 0, 0).sendToTarget();
         }
     }
 
@@ -855,11 +831,11 @@ public class CommandQueue extends IStatusBar.Stub implements
     }
 
     @Override
-    public void showShutdownUi(boolean isReboot, String reason, boolean advancedReboot) {
+    public void showShutdownUi(boolean isReboot, String reason, boolean rebootCustom) {
         synchronized (mLock) {
             mHandler.removeMessages(MSG_SHOW_SHUTDOWN_UI);
-            mHandler.obtainMessage(MSG_SHOW_SHUTDOWN_UI, isReboot ? 1 : 0, advancedReboot ? 1 : 0, reason)
-                    .sendToTarget();
+            mHandler.obtainMessage(MSG_SHOW_SHUTDOWN_UI, isReboot ? 1 : 0,
+                    rebootCustom ? 1 : 0, reason).sendToTarget();
         }
     }
 
@@ -1145,49 +1121,6 @@ public class CommandQueue extends IStatusBar.Stub implements
         GcUtils.runGcAndFinalizersSync();
     }
 
-    @Override
-    public void killForegroundApp() {
-        synchronized (mLock) {
-            mHandler.removeMessages(MSG_KILL_FOREGROUND_APP);
-            mHandler.sendEmptyMessage(MSG_KILL_FOREGROUND_APP);
-        }
-    }
-
-    @Override
-    public void toggleCameraFlash() {
-        synchronized (mLock) {
-            mHandler.removeMessages(MSG_TOGGLE_CAMERA_FLASH);
-            mHandler.sendEmptyMessage(MSG_TOGGLE_CAMERA_FLASH);
-        }
-    }
-
-    @Override
-    public void setBlockedGesturalNavigation(boolean blocked) {
-        synchronized (mLock) {
-            if (mHandler.hasMessages(MSG_SET_BLOCKED_GESTURAL_NAVIGATION)) {
-                mHandler.removeMessages(MSG_SET_BLOCKED_GESTURAL_NAVIGATION);
-            }
-            mHandler.obtainMessage(MSG_SET_BLOCKED_GESTURAL_NAVIGATION, blocked).sendToTarget();
-        }
-    }
-
-    public void screenPinningStateChanged(boolean enabled) {
-        synchronized (mLock) {
-            mHandler.removeMessages(MSG_SCREEN_PINNING_STATE_CHANGED);
-            mHandler.obtainMessage(MSG_SCREEN_PINNING_STATE_CHANGED,
-                    enabled ? 1 : 0, 0, null).sendToTarget();
-        }
-    }
-
-    @Override
-    public void leftInLandscapeChanged(boolean isLeft) {
-        synchronized (mLock) {
-            mHandler.removeMessages(MSG_LEFT_IN_LANDSCAPE_STATE_CHANGED);
-            mHandler.obtainMessage(MSG_LEFT_IN_LANDSCAPE_STATE_CHANGED,
-                    isLeft ? 1 : 0, 0, null).sendToTarget();
-        }
-    }
-
     private final class H extends Handler {
         private H(Looper l) {
             super(l);
@@ -1233,11 +1166,6 @@ public class CommandQueue extends IStatusBar.Stub implements
                 case MSG_TOGGLE_PANEL:
                     for (int i = 0; i < mCallbacks.size(); i++) {
                         mCallbacks.get(i).togglePanel();
-                    }
-                    break;
-                case MSG_TOGGLE_SETTINGS_PANEL:
-                    for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).toggleSettingsPanel();
                     }
                     break;
                 case MSG_EXPAND_SETTINGS:
@@ -1376,7 +1304,8 @@ public class CommandQueue extends IStatusBar.Stub implements
                     break;
                 case MSG_SHOW_SHUTDOWN_UI:
                     for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).handleShowShutdownUi(msg.arg1 != 0, (String) msg.obj, msg.arg2 != 0);
+                        mCallbacks.get(i).handleShowShutdownUi(msg.arg1 != 0, (String) msg.obj,
+                                msg.arg2 != 0);
                     }
                     break;
                 case MSG_SET_TOP_APP_HIDES_STATUS_BAR:
@@ -1565,29 +1494,6 @@ public class CommandQueue extends IStatusBar.Stub implements
                     for (int i = 0; i < mCallbacks.size(); i++) {
                         mCallbacks.get(i).setNavigationBarLumaSamplingEnabled(msg.arg1,
                                 msg.arg2 != 0);
-                    }
-                    break;
-                case MSG_TOGGLE_CAMERA_FLASH:
-                    for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).toggleCameraFlash();
-                    }
-                    break;
-                case MSG_SET_BLOCKED_GESTURAL_NAVIGATION:
-                    mCallbacks.forEach(cb -> cb.setBlockedGesturalNavigation((Boolean) msg.obj));
-                    break;
-                case MSG_KILL_FOREGROUND_APP:
-                    for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).killForegroundApp();
-                    }
-                    break;
-                case MSG_SCREEN_PINNING_STATE_CHANGED:
-                    for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).screenPinningStateChanged(msg.arg1 != 0);
-                    }
-                    break;
-                case MSG_LEFT_IN_LANDSCAPE_STATE_CHANGED:
-                    for (int i = 0; i < mCallbacks.size(); i++) {
-                        mCallbacks.get(i).leftInLandscapeChanged(msg.arg1 != 0);
                     }
                     break;
             }

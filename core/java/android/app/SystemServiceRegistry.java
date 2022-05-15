@@ -202,6 +202,7 @@ import android.telecom.TelecomManager;
 import android.telephony.MmsManager;
 import android.telephony.TelephonyFrameworkInitializer;
 import android.telephony.TelephonyRegistryManager;
+import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Slog;
 import android.uwb.UwbManager;
@@ -233,7 +234,6 @@ import com.android.internal.os.IDropBoxManagerService;
 import com.android.internal.policy.PhoneLayoutInflater;
 import com.android.internal.util.Preconditions;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -253,10 +253,10 @@ public final class SystemServiceRegistry {
     // Service registry information.
     // This information is never changed once static initialization has completed.
     private static final Map<Class<?>, String> SYSTEM_SERVICE_NAMES =
-            new HashMap<Class<?>, String>();
+            new ArrayMap<Class<?>, String>();
     private static final Map<String, ServiceFetcher<?>> SYSTEM_SERVICE_FETCHERS =
-            new HashMap<String, ServiceFetcher<?>>();
-    private static final Map<String, String> SYSTEM_SERVICE_CLASS_NAMES = new HashMap<>();
+            new ArrayMap<String, ServiceFetcher<?>>();
+    private static final Map<String, String> SYSTEM_SERVICE_CLASS_NAMES = new ArrayMap<>();
 
     private static int sServiceCacheSize;
 
@@ -1468,17 +1468,6 @@ public final class SystemServiceRegistry {
                     @Override
                     public DisplayHashManager createService(ContextImpl ctx) {
                         return new DisplayHashManager();
-                    }});
-
-        registerService(Context.APP_LOCK_SERVICE, AppLockManager.class,
-                new CachedServiceFetcher<AppLockManager>() {
-                    @Override
-                    public AppLockManager createService(ContextImpl ctx)
-                            throws ServiceNotFoundException {
-                        IBinder binder = ServiceManager.getServiceOrThrow(
-                                Context.APP_LOCK_SERVICE);
-                        return new AppLockManager(ctx,
-                            IAppLockManagerService.Stub.asInterface(binder));
                     }});
 
         sInitializing = true;

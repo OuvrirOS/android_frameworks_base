@@ -21,9 +21,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHearingAid;
 import android.bluetooth.BluetoothProfile;
-import android.content.ActivityNotFoundException;
-import android.content.ContentResolver;
-import android.content.Context;
 import android.content.Intent;
 import android.media.AudioDeviceAttributes;
 import android.media.AudioDevicePort;
@@ -39,9 +36,6 @@ import android.media.MediaMetrics;
 import android.os.Binder;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
-import android.os.UserHandle;
-import android.provider.Settings;
-import android.telecom.TelecomManager;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -154,8 +148,6 @@ public class AudioDeviceInventory {
     private final @NonNull AudioSystemAdapter mAudioSystem;
 
     private @NonNull AudioDeviceBroker mDeviceBroker;
-    private final Context mContext;
-    private final ContentResolver mContentResolver;
 
     // Monitoring of audio routes.  Protected by mAudioRoutes.
     final AudioRoutesInfo mCurAudioRoutes = new AudioRoutesInfo();
@@ -170,11 +162,9 @@ public class AudioDeviceInventory {
     final RemoteCallbackList<ICapturePresetDevicesRoleDispatcher> mDevRoleCapturePresetDispatchers =
             new RemoteCallbackList<ICapturePresetDevicesRoleDispatcher>();
 
-    /*package*/ AudioDeviceInventory(Context context, @NonNull AudioDeviceBroker broker) {
+    /*package*/ AudioDeviceInventory(@NonNull AudioDeviceBroker broker) {
         mDeviceBroker = broker;
         mAudioSystem = AudioSystemAdapter.getDefaultAdapter();
-        mContext = context;
-        mContentResolver = context.getContentResolver();
     }
 
     //-----------------------------------------------------------
@@ -182,8 +172,6 @@ public class AudioDeviceInventory {
     /*package*/ AudioDeviceInventory(@NonNull AudioSystemAdapter audioSystem) {
         mDeviceBroker = null;
         mAudioSystem = audioSystem;
-        mContext = null;
-        mContentResolver = null;
     }
 
     /*package*/ void setDeviceBroker(@NonNull AudioDeviceBroker broker) {
@@ -567,23 +555,6 @@ public class AudioDeviceInventory {
         DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG_SET.addAll(AudioSystem.DEVICE_OUT_ALL_USB_SET);
     }
 
-    private void startMusicPlayer() {
-        boolean launchPlayer = Settings.System.getIntForUser(mContext.getContentResolver(),
-                Settings.System.HEADSET_CONNECT_PLAYER, 0, UserHandle.USER_CURRENT) != 0;
-        TelecomManager tm = (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
-
-        if (launchPlayer && !tm.isInCall()) {
-            try {
-                Intent playerIntent = new Intent(Intent.ACTION_MAIN);
-                playerIntent.addCategory(Intent.CATEGORY_APP_MUSIC);
-                playerIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                mContext.startActivity(playerIntent);
-            } catch (ActivityNotFoundException | IllegalArgumentException e) {
-                Log.w(TAG, "No music player Activity could be found");
-            }
-        }
-    }
-
     /*package*/ void onSetWiredDeviceConnectionState(
                             AudioDeviceInventory.WiredDeviceConnectionState wdcs) {
         AudioService.sDeviceLogger.log(new AudioServiceEvents.WiredDevConnectEvent(wdcs));
@@ -927,8 +898,9 @@ public class AudioDeviceInventory {
 
             final int a2dpCodec;
             if (state == BluetoothA2dp.STATE_DISCONNECTED) {
-                final String key = DeviceInfo.makeDeviceListKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
-                        device.getAddress());
+                final String key =
+                        DeviceInfo.makeDeviceListKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
+                                device.getAddress());
                 final DeviceInfo di = mConnectedDevices.get(key);
                 if (di != null) {
                     a2dpCodec = di.mDeviceCodecFormat;
@@ -967,17 +939,11 @@ public class AudioDeviceInventory {
             boolean suppressNoisyIntent, int a2dpVolume) {
           if (state == BluetoothProfile.STATE_DISCONNECTED) {
               mDeviceBroker.queueBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(
-                  new AudioDeviceBroker.BtDeviceConnectionInfo(device,state,profile,suppressNoisyIntent, a2dpVolume));
+                      new AudioDeviceBroker.BtDeviceConnectionInfo(device, state, profile,
+                              suppressNoisyIntent, a2dpVolume));
               BtHelper.SetA2dpActiveDevice(null);
               return;
           }
-
-          if (state == BluetoothProfile.STATE_CONNECTED && profile == BluetoothProfile.A2DP_SINK) {
-              mDeviceBroker.queueBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(
-                  new AudioDeviceBroker.BtDeviceConnectionInfo(device,state,profile,suppressNoisyIntent, a2dpVolume));
-              return;
-          }
-
           // state == BluetoothProfile.STATE_CONNECTED
           synchronized (mConnectedDevices) {
                  final String address = device.getAddress();
@@ -991,7 +957,8 @@ public class AudioDeviceInventory {
                      return;
                  }
                  for (Map.Entry<String, DeviceInfo> existingDevice : mConnectedDevices.entrySet()) {
-                      if (existingDevice.getValue().mDeviceType != AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
+                      if (existingDevice.getValue().mDeviceType
+                              != AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
                           continue;
                       }
                       // A2DP device exists, handle active device change
@@ -1014,7 +981,8 @@ public class AudioDeviceInventory {
           }
           // New A2DP device connection
           mDeviceBroker.queueBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(
-                  new AudioDeviceBroker.BtDeviceConnectionInfo(device,state,profile,suppressNoisyIntent, a2dpVolume));
+                  new AudioDeviceBroker.BtDeviceConnectionInfo(device, state, profile,
+                          suppressNoisyIntent, a2dpVolume));
     }
 
     /*package*/ int setWiredDeviceConnectionState(int type, @AudioService.ConnectionState int state,
@@ -1351,17 +1319,11 @@ public class AudioDeviceInventory {
             case AudioSystem.DEVICE_OUT_WIRED_HEADSET:
                 intent.setAction(Intent.ACTION_HEADSET_PLUG);
                 intent.putExtra("microphone", 1);
-                if (state == 1) {
-                    startMusicPlayer();
-                }
                 break;
             case AudioSystem.DEVICE_OUT_WIRED_HEADPHONE:
             case AudioSystem.DEVICE_OUT_LINE:
                 intent.setAction(Intent.ACTION_HEADSET_PLUG);
                 intent.putExtra("microphone", 0);
-                if (state == 1) {
-                    startMusicPlayer();
-                }
                 break;
             case AudioSystem.DEVICE_OUT_USB_HEADSET:
                 intent.setAction(Intent.ACTION_HEADSET_PLUG);

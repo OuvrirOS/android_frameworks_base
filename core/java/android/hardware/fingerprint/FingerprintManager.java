@@ -1007,7 +1007,7 @@ public class FingerprintManager implements BiometricAuthenticator, BiometricFing
                 throw e.rethrowFromSystemServer();
             }
         } else {
-            if (DEBUG) Slog.w(TAG, "isFingerprintHardwareDetected(): Service not connected!");
+            Slog.w(TAG, "isFingerprintHardwareDetected(): Service not connected!");
         }
         return false;
     }
@@ -1036,10 +1036,7 @@ public class FingerprintManager implements BiometricAuthenticator, BiometricFing
      */
     public boolean isPowerbuttonFps() {
         final FingerprintSensorPropertiesInternal sensorProps = getFirstFingerprintSensor();
-        if (sensorProps != null) {
-            return sensorProps.sensorType == TYPE_POWER_BUTTON;
-        }
-        return false;
+        return sensorProps.sensorType == TYPE_POWER_BUTTON;
     }
 
     /**

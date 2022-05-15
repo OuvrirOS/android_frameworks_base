@@ -1047,8 +1047,7 @@ public class DeviceIdleControllerTest {
         verifyLightStateConditions(LIGHT_STATE_IDLE);
         inOrder.verify(mDeviceIdleController).scheduleLightAlarmLocked(
                 longThat(l -> l == mConstants.LIGHT_IDLE_TIMEOUT),
-                longThat(l -> l == mConstants.LIGHT_IDLE_TIMEOUT_INITIAL_FLEX),
-                eq(false));
+                longThat(l -> l == mConstants.LIGHT_IDLE_TIMEOUT_INITIAL_FLEX));
 
         // Should just alternate between IDLE and IDLE_MAINTENANCE now.
 
@@ -1056,22 +1055,19 @@ public class DeviceIdleControllerTest {
         verifyLightStateConditions(LIGHT_STATE_IDLE_MAINTENANCE);
         inOrder.verify(mDeviceIdleController).scheduleLightAlarmLocked(
                 longThat(l -> l >= mConstants.LIGHT_IDLE_MAINTENANCE_MIN_BUDGET),
-                longThat(l -> l == mConstants.FLEX_TIME_SHORT),
-                eq(true));
+                longThat(l -> l == mConstants.FLEX_TIME_SHORT));
 
         mDeviceIdleController.stepLightIdleStateLocked("testing");
         verifyLightStateConditions(LIGHT_STATE_IDLE);
         inOrder.verify(mDeviceIdleController).scheduleLightAlarmLocked(
                 longThat(l -> l > mConstants.LIGHT_IDLE_TIMEOUT),
-                longThat(l -> l > mConstants.LIGHT_IDLE_TIMEOUT_INITIAL_FLEX),
-                eq(false));
+                longThat(l -> l > mConstants.LIGHT_IDLE_TIMEOUT_INITIAL_FLEX));
 
         mDeviceIdleController.stepLightIdleStateLocked("testing");
         verifyLightStateConditions(LIGHT_STATE_IDLE_MAINTENANCE);
         inOrder.verify(mDeviceIdleController).scheduleLightAlarmLocked(
                 longThat(l -> l >= mConstants.LIGHT_IDLE_MAINTENANCE_MIN_BUDGET),
-                longThat(l -> l == mConstants.FLEX_TIME_SHORT),
-                eq(true));
+                longThat(l -> l == mConstants.FLEX_TIME_SHORT));
 
         // Test that motion doesn't reset the idle timeout.
         mDeviceIdleController.handleMotionDetectedLocked(50, "test");
@@ -1080,8 +1076,7 @@ public class DeviceIdleControllerTest {
         verifyLightStateConditions(LIGHT_STATE_IDLE);
         inOrder.verify(mDeviceIdleController).scheduleLightAlarmLocked(
                 longThat(l -> l > mConstants.LIGHT_IDLE_TIMEOUT),
-                longThat(l -> l > mConstants.LIGHT_IDLE_TIMEOUT_INITIAL_FLEX),
-                eq(false));
+                longThat(l -> l > mConstants.LIGHT_IDLE_TIMEOUT_INITIAL_FLEX));
     }
 
     ///////////////// EXIT conditions ///////////////////

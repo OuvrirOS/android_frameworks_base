@@ -51,9 +51,6 @@ public class TunerFragment extends PreferenceFragment {
             "nav_bar",
             "lockscreen",
             "picture_in_picture",
-            "volume_and_do_not_disturb",
-            "doze",
-            KEY_PLUGINS,
     };
 
     private static final int MENU_REMOVE = Menu.FIRST + 1;
@@ -73,13 +70,13 @@ public class TunerFragment extends PreferenceFragment {
 
         setHasOptionsMenu(true);
     }
-/*
+
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         getActivity().getActionBar().setDisplayHomeAsUpEnabled(true);
     }
-*/
+
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         addPreferencesFromResource(R.xml.tuner_prefs);

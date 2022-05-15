@@ -347,6 +347,8 @@ import com.android.server.wm.SurfaceAnimator.AnimationType;
 import com.android.server.wm.WindowManagerService.H;
 import com.android.server.wm.utils.InsetUtils;
 
+import com.google.android.collect.Sets;
+
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
@@ -3143,6 +3145,19 @@ final class ActivityRecord extends WindowToken implements WindowManagerService.A
                 }
                 mDisplayContent.prepareAppTransition(TRANSIT_CLOSE);
 
+                // When finishing the activity preemptively take the snapshot before the app window
+                // is marked as hidden and any configuration changes take place
+                // Note that RecentsAnimation will handle task snapshot while switching apps with
+                // the best capture timing (e.g. IME window capture),
+                // No need additional task capture while task is controlled by RecentsAnimation.
+                if (mAtmService.mWindowManager.mTaskSnapshotController != null
+                        && !task.isAnimatingByRecents()) {
+                    final ArraySet<Task> tasks = Sets.newArraySet(task);
+                    mAtmService.mWindowManager.mTaskSnapshotController.snapshotTasks(tasks);
+                    mAtmService.mWindowManager.mTaskSnapshotController
+                            .addSkipClosingAppSnapshotTasks(tasks);
+                }
+
                 // Tell window manager to prepare for this one to be removed.
                 setVisibility(false);
 
@@ -5171,10 +5186,6 @@ final class ActivityRecord extends WindowToken implements WindowManagerService.A
                 mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_STOPPED);
                 break;
             case DESTROYED:
-                if (app != null && (mVisible || mVisibleRequested)) {
-                    // The app may be died while visible (no PAUSED state).
-                    mAtmService.updateBatteryStats(this, false);
-                }
                 mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_DESTROYED);
                 // Fall through.
             case DESTROYING:
@@ -6367,8 +6378,7 @@ final class ActivityRecord extends WindowToken implements WindowManagerService.A
         }
 
         if (windowFromSameProcessAsActivity) {
-            return mAtmService.mAmInternal.inputDispatchingTimedOut(
-                    anrApp != null? anrApp.mOwner : null,
+            return mAtmService.mAmInternal.inputDispatchingTimedOut(anrApp.mOwner,
                     anrActivity.shortComponentName, anrActivity.info.applicationInfo,
                     shortComponentName, app, false, reason);
         } else {
@@ -8246,7 +8256,7 @@ final class ActivityRecord extends WindowToken implements WindowManagerService.A
         int activityHeight = containingAppHeight;
 
         if (containingRatio > desiredAspectRatio) {
-            if (mAtmService.shouldForceCutoutFullscreen(packageName)) {
+            if (mAtmService.shouldForceLongScreen(packageName)) {
                 // Use containingAppWidth/Height for maxActivityWidth/Height when force long screen
             } else if (containingAppWidth < containingAppHeight) {
                 // Width is the shorter side, so we use that to figure-out what the max. height

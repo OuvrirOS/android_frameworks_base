@@ -65,7 +65,6 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RotateDrawable;
-import android.media.AppVolume;
 import android.media.AudioManager;
 import android.media.AudioSystem;
 import android.media.session.MediaController;
@@ -115,7 +114,6 @@ import androidx.annotation.Nullable;
 import com.android.internal.graphics.drawable.BackgroundBlurDrawable;
 import com.android.internal.view.RotationPolicy;
 import com.android.settingslib.Utils;
-import com.android.systemui.Dependency;
 import com.android.systemui.Prefs;
 import com.android.systemui.R;
 import com.android.systemui.animation.Interpolators;
@@ -132,6 +130,8 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.AlphaTintDrawableWrapper;
 import com.android.systemui.util.RoundedCornerProgressDrawable;
+
+import ouvriros.providers.OuvrirSettings;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -151,7 +151,7 @@ public class VolumeDialogImpl implements VolumeDialog,
     private static final String TAG = Util.logTag(VolumeDialogImpl.class);
 
     private static final String VOLUME_PANEL_ON_LEFT =
-            Settings.Secure.VOLUME_PANEL_ON_LEFT;
+            "ouvrirsecure:" + OuvrirSettings.Secure.VOLUME_PANEL_ON_LEFT;
 
     private static final long USER_ATTEMPT_GRACE_PERIOD = 1000;
     private static final int UPDATE_ANIMATION_DURATION = 80;
@@ -241,8 +241,6 @@ public class VolumeDialogImpl implements VolumeDialog,
     private ImageButton mSettingsIcon;
     private View mExpandRowsView;
     private ExpandableIndicator mExpandRows;
-    private View mAppVolumeView;
-    private ImageButton mAppVolumeIcon;
     private FrameLayout mZenIcon;
     private final List<VolumeRow> mRows = new ArrayList<>();
     private ConfigurableTexts mConfigurableTexts;
@@ -630,9 +628,6 @@ public class VolumeDialogImpl implements VolumeDialog,
         mExpandRowsView = mDialog.findViewById(R.id.expandable_indicator_container);
         mExpandRows = mDialog.findViewById(R.id.expandable_indicator);
 
-        mAppVolumeView = mDialog.findViewById(R.id.app_volume_container);
-        mAppVolumeIcon = mDialog.findViewById(R.id.app_volume);
-
         if (mVolumePanelOnLeft) {
             if (mRingerAndDrawerContainer != null) {
                 mRingerAndDrawerContainer.setLayoutDirection(LAYOUT_DIRECTION_RTL);
@@ -695,7 +690,6 @@ public class VolumeDialogImpl implements VolumeDialog,
         updateRowsH(getActiveRow());
         initRingerH();
         initSettingsH();
-        initAppVolumeH();
         initODICaptionsH();
     }
 
@@ -760,7 +754,7 @@ public class VolumeDialogImpl implements VolumeDialog,
     }
 
     private boolean shouldSlideInVolumeTray() {
-        return mContext.getDisplay().getRotation() != RotationPolicy.NATURAL_ROTATION;
+        return mContext.getDisplay().getRotation() != RotationPolicy.getNaturalRotation();
     }
 
     private boolean isLandscape() {
@@ -1281,39 +1275,6 @@ public class VolumeDialogImpl implements VolumeDialog,
         }
     }
 
-    private boolean shouldShowAppVolume() {
-        ContentResolver cr = mContext.getContentResolver();
-        int showAppVolume = Settings.System.getInt(cr, Settings.System.SHOW_APP_VOLUME, 0);
-        boolean ret = showAppVolume == 1;
-        if (ret) {
-            ret = false;
-            AudioManager audioManager = mController.getAudioManager();
-            for (AppVolume av : audioManager.listAppVolumes()) {
-                if (av.isActive()) {
-                    ret = true;
-            break;
-                }
-            }
-        }
-        return ret;
-    }
-
-    public void initAppVolumeH() {
-        if (mAppVolumeView != null) {
-            mAppVolumeView.setVisibility(shouldShowAppVolume() ? VISIBLE : GONE);
-        }
-        if (mAppVolumeIcon != null) {
-            mAppVolumeIcon.setOnClickListener(v -> {
-                Events.writeEvent(Events.EVENT_SETTINGS_CLICK);
-                Intent intent = new Intent(Settings.Panel.ACTION_APP_VOLUME);
-                dismissH(DISMISS_REASON_SETTINGS_CLICKED);
-                Dependency.get(MediaOutputDialogFactory.class).dismiss();
-                Dependency.get(ActivityStarter.class).startActivity(intent,
-                        true /* dismissShade */);
-            });
-        }
-    }
-
     public void initRingerH() {
         if (mRingerIcon != null) {
             mRingerIcon.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);
@@ -1551,7 +1512,6 @@ public class VolumeDialogImpl implements VolumeDialog,
         }
 
         initSettingsH();
-        initAppVolumeH();
         mShowing = true;
         mIsAnimatingDismiss = false;
         mDialog.show();
@@ -1625,13 +1585,13 @@ public class VolumeDialogImpl implements VolumeDialog,
                     mIsAnimatingDismiss = false;
 
                     hideRingerDrawer();
-                    mController.notifyVisible(false);
                 }, 50));
         if (!shouldSlideInVolumeTray()) {
             animator.translationX(getTranslationForPanelLocation() * mDialogView.getWidth() / 2.0f);
         }
         animator.start();
         checkODICaptionsTooltip(true);
+        mController.notifyVisible(false);
         synchronized (mSafetyWarningLock) {
             if (mSafetyWarning != null) {
                 if (D.BUG) Log.d(TAG, "SafetyWarning dismissed");
@@ -2076,8 +2036,7 @@ public class VolumeDialogImpl implements VolumeDialog,
 
         // update slider max
         final int max = ss.levelMax * 100;
-        final boolean maxChanged = max != row.slider.getMax();
-        if (maxChanged) {
+        if (max != row.slider.getMax()) {
             row.slider.setMax(max);
         }
         // update slider min
@@ -2170,7 +2129,7 @@ public class VolumeDialogImpl implements VolumeDialog,
         final boolean enableSlider = !zenMuted;
         final int vlevel = row.ss.muted && (!isRingStream && !zenMuted) ? 0
                 : row.ss.level;
-        updateVolumeRowSliderH(row, enableSlider, vlevel, maxChanged);
+        updateVolumeRowSliderH(row, enableSlider, vlevel);
         if (row.number != null) row.number.setText(Integer.toString(vlevel));
     }
 
@@ -2223,7 +2182,7 @@ public class VolumeDialogImpl implements VolumeDialog,
         }
     }
 
-    private void updateVolumeRowSliderH(VolumeRow row, boolean enable, int vlevel, boolean maxChanged) {
+    private void updateVolumeRowSliderH(VolumeRow row, boolean enable, int vlevel) {
         row.slider.setEnabled(enable);
         updateVolumeRowTintH(row, row.stream == mActiveStream);
         if (row.tracking) {
@@ -2247,7 +2206,7 @@ public class VolumeDialogImpl implements VolumeDialog,
             }
         }
         final int newProgress = vlevel * 100;
-        if (progress != newProgress || maxChanged) {
+        if (progress != newProgress) {
             if (mShowing && rowVisible) {
                 // animate!
                 if (row.anim != null && row.anim.isRunning()

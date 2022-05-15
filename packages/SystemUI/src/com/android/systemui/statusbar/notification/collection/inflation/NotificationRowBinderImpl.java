@@ -232,8 +232,7 @@ public class NotificationRowBinderImpl implements NotificationRowBinder {
 
         // TODO: Replace this API with RowContentBindParams directly. Also move to a separate
         // redaction controller.
-        row.setNeedsRedaction(mNotificationLockscreenUserManager.needsRedaction(entry)
-            || entry.getSbn().getIsContentSecure());
+        row.setNeedsRedaction(mNotificationLockscreenUserManager.needsRedaction(entry));
 
         params.rebindAllContentViews();
         mRowContentBindStage.requestRebind(entry, en -> {

@@ -121,7 +121,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
         mContext = context;
         mAudioService = service;
         mBtHelper = new BtHelper(this);
-        mDeviceInventory = new AudioDeviceInventory(mContext,this);
+        mDeviceInventory = new AudioDeviceInventory(this);
         mSystemServer = SystemServerAdapter.getDefaultAdapter(mContext);
 
         init();
@@ -1511,22 +1511,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
     // process external command to (dis)connect a hearing aid device
     private static final int MSG_L_HEARING_AID_DEVICE_CONNECTION_CHANGE_EXT = 31;
 
-    private static final int MSG_IL_SAVE_PREF_DEVICES_FOR_STRATEGY = 32;
-    private static final int MSG_I_SAVE_REMOVE_PREF_DEVICES_FOR_STRATEGY = 33;
-
-    private static final int MSG_L_COMMUNICATION_ROUTE_CLIENT_DIED = 34;
-    private static final int MSG_CHECK_MUTE_MUSIC = 35;
-    private static final int MSG_REPORT_NEW_ROUTES_A2DP = 36;
-
-    private static final int MSG_IL_SAVE_PREF_DEVICES_FOR_CAPTURE_PRESET = 37;
-    private static final int MSG_I_SAVE_CLEAR_PREF_DEVICES_FOR_CAPTURE_PRESET = 38;
-
-    private static final int MSG_L_UPDATE_COMMUNICATION_ROUTE = 39;
-    private static final int MSG_IL_SET_PREF_DEVICES_FOR_STRATEGY = 40;
-    private static final int MSG_I_REMOVE_PREF_DEVICES_FOR_STRATEGY = 41;
-
     // process external command to (dis)connect or change active A2DP device
-    private static final int MSG_L_A2DP_ACTIVE_DEVICE_CHANGE_EXT = 64;
+    private static final int MSG_L_A2DP_ACTIVE_DEVICE_CHANGE_EXT = 32;
+
+    private static final int MSG_IL_SAVE_PREF_DEVICES_FOR_STRATEGY = 33;
+    private static final int MSG_I_SAVE_REMOVE_PREF_DEVICES_FOR_STRATEGY = 34;
+
+    private static final int MSG_L_COMMUNICATION_ROUTE_CLIENT_DIED = 35;
+    private static final int MSG_CHECK_MUTE_MUSIC = 36;
+    private static final int MSG_REPORT_NEW_ROUTES_A2DP = 37;
+
+    private static final int MSG_IL_SAVE_PREF_DEVICES_FOR_CAPTURE_PRESET = 38;
+    private static final int MSG_I_SAVE_CLEAR_PREF_DEVICES_FOR_CAPTURE_PRESET = 39;
+
+    private static final int MSG_L_UPDATE_COMMUNICATION_ROUTE = 40;
+    private static final int MSG_IL_SET_PREF_DEVICES_FOR_STRATEGY = 41;
+    private static final int MSG_I_REMOVE_PREF_DEVICES_FOR_STRATEGY = 42;
 
     private static boolean isMessageHandledUnderWakelock(int msgId) {
         switch(msgId) {

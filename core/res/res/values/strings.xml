@@ -837,16 +837,6 @@
     <!-- Description of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permgroupdesc_sensors">access sensor data about your vital signs</string>
 
-    <!-- Title of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgrouplab_otherSensors">Sensors</string>
-    <!-- Description of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgroupdesc_otherSensors">access sensor data about orientation, movement, etc.</string>
-
-    <!-- Title of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgrouplab_network">Network</string>
-    <!-- Description of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgroupdesc_network">access the network</string>
-
     <!-- Title for the capability of an accessibility service to retrieve window content. -->
     <string name="capability_title_canRetrieveWindowContent">Retrieve window content</string>
     <!-- Description for the capability of an accessibility service to retrieve window content. -->
@@ -889,18 +879,6 @@
     <string name="capability_desc_canTakeScreenshot">Can take a screenshot of the display.</string>
 
     <!--  Permissions -->
-
-    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permlab_fakePackageSignature">Spoof package signature</string>
-    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permdesc_fakePackageSignature">Allows the app to pretend to be a different app. Malicious applications might be able to use this to access private application data. Legitimate uses include an emulator pretending to be what it emulates. Grant this permission with caution only!</string>
-    <!-- Title of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgrouplab_fake_package_signature">Spoof package signature</string>
-    <!-- Description of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgroupdesc_fake_package_signature">allow to spoof package signature</string>
-    <!-- Message shown to the user when the apps requests permission from this group. If ever possible this should stay below 80 characters (assuming the parameters takes 20 characters). Don't abbreviate until the message reaches 120 characters though. [CHAR LIMIT=120] -->
-    <string name="permgrouprequest_fake_package_signature">Allow
-        &lt;b><xliff:g id="app_name" example="Gmail">%1$s</xliff:g>&lt;/b> to spoof package signature?</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permlab_statusBar">disable or modify status bar</string>
@@ -1181,13 +1159,6 @@
     <!-- Description of the body sensors permission, listed so the user can decide whether to allow the application to access data from body sensors. [CHAR LIMIT=NONE] -->
     <string name="permdesc_bodySensors" product="default">Allows the app to access data from sensors
     that monitor your physical condition, such as your heart rate.</string>
-
-    <!-- Title of the sensors permission, listed so the user can decide whether to allow the application to access sensor data. [CHAR LIMIT=80] -->
-    <string name="permlab_otherSensors">access sensors (like the compass)
-    </string>
-    <!-- Description of the sensors permission, listed so the user can decide whether to allow the application to access data from sensors. [CHAR LIMIT=NONE] -->
-    <string name="permdesc_otherSensors" product="default">Allows the app to access data from sensors
-    monitoring orientation, movement, vibration (including low frequency sound) and environmental data</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permlab_readCalendar">Read calendar events and details</string>
@@ -1792,7 +1763,6 @@
 
     <!-- Array containing custom error messages from vendor.  Vendor is expected to add and translate these strings -->
     <string-array name="face_error_vendor">
-        <item>@string/face_unlock_disabled_idle</item>
     </string-array>
     <!-- Default error message to use when face_error_vendor does not contain a message. [CHAR LIMIT=NONE] -->
     <string name="face_error_vendor_unknown">Something went wrong. Try again.</string>
@@ -5052,16 +5022,16 @@
     <string name="time_placeholder">--</string>
 
     <!-- DO NOT TRANSLATE -->
-    <string name="radial_numbers_typeface">@string/config_bodyFontFamily</string>
+    <string name="radial_numbers_typeface">sans-serif</string>
     <!-- DO NOT TRANSLATE -->
-    <string name="sans_serif">@string/config_bodyFontFamily</string>
+    <string name="sans_serif">sans-serif</string>
 
     <!-- DO NOT TRANSLATE -->
-    <string name="date_picker_month_typeface">@string/config_bodyFontFamilyMedium</string>
+    <string name="date_picker_month_typeface">sans-serif-medium</string>
     <!-- DO NOT TRANSLATE -->
-    <string name="date_picker_day_of_week_typeface">@string/config_bodyFontFamilyMedium</string>
+    <string name="date_picker_day_of_week_typeface">sans-serif-medium</string>
     <!-- DO NOT TRANSLATE -->
-    <string name="date_picker_day_typeface">@string/config_bodyFontFamilyMedium</string>
+    <string name="date_picker_day_typeface">sans-serif-medium</string>
 
     <!-- Lock-to-app unlock pin string -->
     <string name="lock_to_app_unlock_pin">Ask for PIN before unpinning</string>
